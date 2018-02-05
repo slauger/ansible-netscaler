@@ -1,0 +1,22 @@
+---
+
+- name: Configure NTP servers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      ntpserver:
+        - servername: "{{ item }}"
+    params:
+      'idempotent': 'yes'
+  with_items: "{{ netscaler_ntp_servers }}"
+
+- name: Enable NTP sync
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "ntpsync"
+    data: '{"ntpsync":{}}'
+    params:
+      'action': 'enable'
