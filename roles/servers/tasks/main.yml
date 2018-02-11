@@ -1,0 +1,12 @@
+---
+- name: Create server objects
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data: "{{ netscaler_server_servers | to_json }}"
+    params:
+      'idempotent': 'yes'
+  when: netscaler_server_servers is defined

@@ -1,0 +1,194 @@
+---
+
+- name: Create basic configuration for ShareFile Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_sharefile_data
+          servicetype: SSL
+          comment: Sharefile Storage Zone
+        - servicegroupname: sg_ssl_sharefile_connectors
+          servicetype: SSL
+          comment: Sharefile CIFS and SharePoint
+        - servicegroupname: sg_ssl_sharefile_options
+          servicetype: SSL
+          comment: Sharefile Options
+      lbmonitor:
+        - monitorname: mon_sharefile
+          type: HTTP-ECV
+          send: GET /heartbeat.aspx
+          recv: "***ONLINE***"
+          lrtm: DISABLED
+          interval: 30
+          secure: "YES"
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_ssl_sharefile_data
+          monitor_name: mon_sharefile
+        - servicegroupname: sg_ssl_sharefile_connectors
+          monitor_name: mon_sharefile
+        - servicegroupname: sg_ssl_sharefile_options
+          monitor_name: mon_sharefile
+      lbvserver:
+        - name: vs_lb_http_sharefile_data
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: Sharefile Storage Zone Loadbalancing
+        - name: vs_lb_http_sharefile_connectors
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: Sharefile CIFS and SharePoint Loadbalancing
+        - name: vs_lb_http_sharefile_options
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: Sharefile Options Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_http_sharefile_data
+          servicegroupname: sg_ssl_sharefile_data
+        - name: vs_lb_http_sharefile_connectors
+          servicegroupname: sg_ssl_sharefile_connectors
+        - name: vs_lb_http_sharefile_options
+          servicegroupname: sg_ssl_sharefile_options
+      csvserver:
+        name: vs_cs_ssl_sharefile
+        servicetype: SSL
+        ipv46: "{{ netscaler_sharefile_vip }}"
+        port: 443
+        comment: Sharefile Content Switch
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_cs_ssl_sharefile
+          certkeyname: "{{ netscaler_sharefile_certkey }}"
+      policyhttpcallout:
+        - name: callout_sharefile
+          vserver: vs_lb_http_sharefile_data
+          returntype: BOOL
+          scheme: http
+          hostexpr: '"sharefile"'
+          urlstemexpr: '"/validate.ashx?RequestURI=" + HTTP.REQ.URL.BEFORE_STR("&h").HTTP_URL_SAFE.B64ENCODE + "&h="+ HTTP.REQ.URL.QUERY.VALUE("h")'
+          resultexpr: HTTP.RES.STATUS.EQ(200).NOT
+        - name: callout_sharefile_y
+          vserver: vs_lb_http_sharefile_data
+          returntype: BOOL
+          scheme: http
+          hostexpr: '"sharefile"'
+          urlstemexpr: '"/validate.ashx?RequestURI=" + HTTP.REQ.URL.HTTP_URL_SAFE.B64ENCODE + "&h="'
+          resultexpr: HTTP.RES.STATUS.EQ(200).NOT
+    params:
+      'idempotent': 'yes'
+      'onerror': 'continue'
+
+- name: Create HTTP callout responder policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      responderpolicy:
+        - name: pol_responder_sharefile_filter
+          rule: 'HTTP.REQ.URL.CONTAINS("&h=") && HTTP.REQ.URL.CONTAINS("/crossdomain.xml").NOT && HTTP.REQ.URL.CONTAINS("/validate.ashxrequri").NOT && SYS.HTTP_CALLOUT(callout_sharefile) || HTTP.REQ.URL.CONTAINS("&h=").NOT && HTTP.REQ.URL.CONTAINS("/crossdomain.xml").NOT && HTTP.REQ.URL.CONTAINS("/validate.ashxrequri").NOT && SYS.HTTP_CALLOUT(callout_sharefile_y)'
+          action: DROP
+          comment: Filter policy for invalid ShareFile requests
+
+- name: Binding Sharefile responder filter policy to LB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      lbvserver_responderpolicy_binding:
+        name: vs_lb_http_sharefile_data
+        policyname: pol_responder_sharefile_filter
+        priority: 100
+
+- name: Create content switching actions
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      csaction:
+        - name: act_cs_sharefile_data
+          targetlbvserver: vs_lb_http_sharefile_data
+          comment: Sharefile Storage Zone
+        - name: act_cs_sharefile_connectors
+          targetlbvserver: vs_lb_http_sharefile_connectors
+          comment: Sharefile CIFS and SharePoint
+        - name: act_cs_sharefile_options
+          targetlbvserver: vs_lb_http_sharefile_options
+          comment: Sharefile Options requests
+
+- name: Create content switching policies
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      cspolicy:
+        - policyname: pol_cs_sharefile_data
+          rule: HTTP.REQ.URL.CONTAINS("/cifs/").NOT && HTTP.REQ.URL.CONTAINS("/sp/").NOT || HTTP.REQ.URL.CONTAINS("/ProxyService/").NOT
+          action: act_cs_sharefile_data
+        - policyname: pol_cs_sharefile_connectors
+          rule: HTTP.REQ.URL.CONTAINS("/cifs/") || HTTP.REQ.URL.CONTAINS("/sp/") || HTTP.REQ.URL.CONTAINS("/ProxyService/")
+          action: act_cs_sharefile_connectors
+        - policyname: pol_cs_sharefile_options
+          rule: HTTP.REQ.METHOD.EQ("OPTIONS")
+          action: act_cs_sharefile_options
+
+- name: Bind content switching policies to vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      csvserver_cspolicy_binding: 
+        - priority: 100
+          name: vs_cs_ssl_sharefile
+          policyname: pol_cs_sharefile_options
+          gotopriorityexpression: END
+        - priority: 200
+          name: vs_cs_ssl_sharefile
+          policyname: pol_cs_sharefile_connectors
+          gotopriorityexpression: END
+        - priority: 300
+          name: vs_cs_ssl_sharefile
+          policyname: pol_cs_sharefile_data
+          gotopriorityexpression: END
+
+- name: Bind members to the service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_sharefile_data
+          servername: "{{ item }}"
+          port: 443
+        - servicegroupname: sg_ssl_sharefile_connectors
+          servername: "{{ item }}"
+          port: 443
+        - servicegroupname: sg_ssl_sharefile_options
+          servername: "{{ item }}"
+          port: 443
+  with_items: "{{ netscaler_sharefile_servers }}"
+  when: netscaler_sharefile_servers is defined

@@ -1,0 +1,279 @@
+---
+
+- name: enable the required features
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: nsfeature
+    data:
+      nsfeature:
+        feature: lb ssl sslvpn
+    params:
+      action: enable
+
+- name: Creating XenMobile vServers and service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_bridge_xm_mdm
+          servicetype: SSL_BRIDGE
+        - servicegroupname: sg_ssl_bridge_xm_mdm_ios
+          servicetype: SSL_BRIDGE
+        - servicegroupname: sg_ssl_xm_mam
+          servicetype: SSL
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_ssl_bridge_xm_mdm
+          monitor_name: tcp
+        - servicegroupname: sg_ssl_bridge_xm_mdm_ios
+          monitor_name: tcp
+        - servicegroupname: sg_ssl_xm_mam
+          monitor_name: tcp
+      lbvserver:
+        - name: vs_lb_ssl_bridge_xm_mdm
+          ipv46: "{{ netscaler_xenmobile_mdm_vip }}"
+          port: '443'
+          servicetype: SSL_BRIDGE
+          persistencetype: SSLSESSION
+          timeout: '5'
+        - name: vs_lb_ssl_bridge_xm_mdm_ios
+          ipv46: "{{ netscaler_xenmobile_mdm_vip }}"
+          port: '8443'
+          servicetype: SSL_BRIDGE
+          persistencetype: SSLSESSION
+          timeout: '5'
+        - name: vs_lb_ssl_mam
+          ipv46: "{{ netscaler_xenmobile_mam_lb_vip }}"
+          port: '8443'
+          servicetype: SSL
+          persistencetype: SOURCEIP
+          timeout: '5'
+      lbvserver_servicegroup_binding:
+        - servicegroupname: sg_ssl_bridge_xm_mdm
+          name: vs_lb_ssl_bridge_xm_mdm
+        - servicegroupname: sg_ssl_bridge_xm_mdm_ios
+          name: vs_lb_ssl_bridge_xm_mdm_ios
+        - servicegroupname: sg_ssl_xm_mam
+          name: vs_lb_ssl_mam
+      vpnvserver:
+        - name: vs_vpn_xm_mam_gateway
+          servicetype: SSL
+          ipv46: "{{ netscaler_xenmobile_mam_vip }}"
+          port: '443'
+          maxloginattempts: '10'
+          failedlogintimeout: '30'
+
+- name: Binding XenMobile servers to the service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_bridge_xm_mdm
+          servername: "{{ item }}"
+          port: '443'
+        - servicegroupname: sg_ssl_bridge_xm_mdm_ios
+          servername: "{{ item }}"
+          port: '8443'
+        - servicegroupname: sg_ssl_xm_mam
+          servername: "{{ item }}"
+          port: '8443'
+      vpnvserver_staserver_binding:
+        - name: vs_vpn_xm_mam_gateway
+          staaddresstype: IPV4
+          staserver: "https://{{ item }}:8443"
+  with_items: "{{ netscaler_xenmobile_servers }}"
+  when: netscaler_xenmobile_servers is defined
+
+- name: Creating session policies and profiles
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnsessionaction:
+        - name: act_session_xenmobile_os
+          splitdns: BOTH
+          sesstimeout: '1440'
+          splittunnel: 'OFF'
+          transparentinterception: 'ON'
+          defaultauthorizationaction: ALLOW
+          sso: 'ON'
+          ssocredential: PRIMARY
+          icaproxy: 'OFF'
+          clientchoices: 'OFF'
+          forcedtimeout: '1440'
+          clientlessvpnmode: 'ON'
+          clientlessmodeurlencoding: TRANSPARENT
+          securebrowse: ENABLED
+          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
+        - name: act_session_xenmobile_web
+          splitdns: BOTH
+          sesstimeout: '1440'
+          splittunnel: 'OFF'
+          transparentinterception: 'ON'
+          defaultauthorizationaction: ALLOW
+          sso: 'ON'
+          ssocredential: PRIMARY
+          icaproxy: 'OFF'
+          clientchoices: 'OFF'
+          forcedtimeout: '1440'
+          clientlessvpnmode: 'ON'
+          clientlessmodeurlencoding: TRANSPARENT
+          securebrowse: ENABLED
+          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
+          homepage: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
+          wihome: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
+        - name: act_session_xenmobile_ag
+          splitdns: BOTH
+          sesstimeout: '1440'
+          splittunnel: 'OFF'
+          transparentinterception: 'ON'
+          defaultauthorizationaction: ALLOW
+          sso: 'ON'
+          ssocredential: PRIMARY
+          icaproxy: 'OFF'
+          clientchoices: 'OFF'
+          forcedtimeout: '1440'
+          clientlessvpnmode: 'OFF'
+          clientlessmodeurlencoding: TRANSPARENT
+          securebrowse: ENABLED
+          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
+          homepage: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
+      vpnsessionpolicy:
+        - name: pol_session_xenmobile_os
+          rule: REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver && REQ.HTTP.HEADER X-Citrix-Gateway EXISTS
+          action: act_session_xenmobile_os
+        - name: pol_session_xenmobile_web
+          rule: REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver && REQ.HTTP.HEADER Referer EXISTS
+          action: act_session_xenmobile_web
+        - name: pol_session_xenmobile_ag
+          rule: REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver && REQ.HTTP.HEADER Referer NOTEXISTS
+          action: act_session_xenmobile_ag
+      vpnvserver_vpnsessionpolicy_binding:
+        - name: vs_vpn_xm_mam_gateway
+          priority: '100'
+          policy: pol_session_xenmobile_os
+        - name: vs_vpn_xm_mam_gateway
+          priority: '200'
+          policy: pol_session_xenmobile_web
+        - name: vs_vpn_xm_mam_gateway
+          priority: '300'
+          policy: pol_session_xenmobile_ag
+    onerror: "continue"
+
+- name: Create the Storefront Cookie Rewrite Policies
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      policypatset:
+        - name: storefront_cookies
+      policypatset_pattern_binding:
+        - string: "{{ netscaler_xenmobile_fqdn }}"
+          name: ns_cvpn_default_inet_domains
+        - string: "{{ netscaler_xenmobile_fqdn }}:8443"
+          name: ns_cvpn_default_inet_domains
+      vpnclientlessaccessprofile:
+        - profilename: prof_clientless_sf_rewrite
+        - profilename: prof_clientless_no_rewrite
+      vpnclientlessaccesspolicy:
+        - name: pol_clientless_sf_rewrite
+          rule: 'true'
+          profilename: prof_clientless_sf_rewrite
+        - name: pol_clientless_no_rewrite
+          rule: HTTP.REQ.HEADER("User-Agent").CONTAINS("CitrixReceiver") && HTTP.REQ.HEADER("X-Citrix-Gateway").EXISTS
+          profilename: prof_clientless_no_rewrite
+
+- name: Binding pattern to the Storefront Cookie Rewrite Policies
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      policypatset_pattern_binding:
+        - string: CsrfToken
+          name: storefront_cookies
+        - string: ASP.NET_SessionId
+          name: storefront_cookies
+        - string: CtxsPluginAssistantState
+          name: storefront_cookies
+        - string: CtxsAuthId
+          name: storefront_cookies
+
+- name: Bind pattern to the clientless access profiles
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: put
+    objecttype: "macroapi"
+    data:
+      vpnclientlessaccessprofile:
+        - profilename: prof_clientless_sf_rewrite
+          urlrewritepolicylabel: ns_cvpn_default_inet_url_label
+          clientconsumedcookies: storefront_cookies
+        - profilename: prof_clientless_no_rewrite
+          urlrewritepolicylabel: ns_cvpn_default_inet_url_label
+          clientconsumedcookies: storefront_cookies
+
+- name: Bind the Storefront Cookie Rewrite Policies to the vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_vpnclientlessaccesspolicy_binding:
+        - name: vs_vpn_xm_mam_gateway
+          policy: pol_clientless_sf_rewrite
+          priority: '200'
+        - name: vs_vpn_xm_mam_gateway
+          policy: pol_clientless_no_rewrite
+          priority: '100'
+
+- name: Create the local DNS record for MAM LB access
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnsaddrec:
+        - hostname: "{{ netscaler_xenmobile_fqdn }}"
+          ipaddress: "{{ netscaler_xenmobile_mam_lb_vip }}"
+
+- name: Configure global VPN intranet domains
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+        vpnglobal_domain_binding:
+          - intranetdomain: "{{ item }}"
+  with_items: "{{ netscaler_xenmobile_intranet_domains }}"
+  when: netscaler_xenmobile_intranet_domains is defined
+
+- name: Binding LDAP authentication policies to the VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_authenticationldappolicy_binding:
+        - name: vs_vpn_xm_mam_gateway
+          policy: "{{ item }}"
+  with_items: "{{ netscaler_xenmobile_ldap_policies }}"
+  when: netscaler_xenmobile_ldap_policies is defined

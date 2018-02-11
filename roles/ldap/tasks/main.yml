@@ -1,0 +1,78 @@
+---
+
+- block:
+  - name: Setup LDAP authentication policy
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      objecttype: "macroapi"
+      data:
+        authenticationldapaction:
+          name: act_auth_ldap_default
+          serverip: "{{ netscaler_ldap_server }}"
+          serverport: "{{ netscaler_ldap_port | default(636) }}"
+          authtimeout: 3
+          ldapbase: "{{ netscaler_ldap_basedn }}"
+          ldapbinddn: "{{ netscaler_ldap_binddn }}"
+          ldapbinddnpassword: "{{ netscaler_ldap_bindpw }}"
+          ldaploginname: "{{ netscaler_ldap_loginname }}"
+          searchfilter: "{{ netscaler_ldap_filter }}"
+          groupattrname: memberOf
+          subattributename: CN
+          sectype: "{{ netscaler_ldap_sectype }}"
+          ssonameattribute: "{{ netscaler_ldap_ssoattribute }}"
+          passwdchange: ENABLED
+          nestedgroupextraction: "ON"
+          maxnestinglevel: 2
+          validateservercert: "NO"
+          ldaphostname: "{{ netscaler_ldap_hostname }}"
+          groupnameidentifier: sAMAccountName
+          groupsearchattribute: memberOf
+          groupsearchsubattribute: CN
+          email: mail
+          otpsecret:
+        authenticationldappolicy:
+          - name: pol_auth_ldap_default
+            rule: ns_true
+            reqaction: act_auth_ldap_default
+          - name: pol_auth_ldap_default_receiver
+            rule: "REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver"
+            reqaction: act_auth_ldap_default
+          - name: pol_auth_ldap_default_not_receiver
+            rule: "REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver"
+            reqaction: act_auth_ldap_default
+
+  - name: Add system groups and bind superuser policy
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      objecttype: "macroapi"
+      data:
+        systemgroup:
+          groupname: "{{ item }}"
+        systemgroup_systemcmdpolicy_binding:
+          priority: 100
+          policyname: superuser
+          groupname: "{{ item }}"
+    with_items: "{{ netscaler_ldap_admin_groups }}"
+    when: netscaler_ldap_admin_groups is defined
+
+  - name: Bind LDAP authentication policy globally
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      objecttype: "macroapi"
+      data:
+        systemglobal_authenticationldappolicy_binding:
+          policyname: pol_auth_ldap_default
+          priority: 100
+
+  when: netscaler_ldap_server is defined and
+        netscaler_ldap_basedn is defined
+
+      
+
+

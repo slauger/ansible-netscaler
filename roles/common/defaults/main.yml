@@ -1,0 +1,50 @@
+---
+
+# defaults file for netscaler_configs
+netscaler_common_config:
+  nsconfig:
+    cip: ENABLED
+    cipheader: X-Forwarded-For
+    cookieversion: 1
+    securecookie: ENABLED
+    timezone: "GMT+01:00-CET-Europe/Berlin"
+
+# default secure cipherset
+netscaler_common_sslcipher_sslciphersuite_binding:
+  sslcipher_sslciphersuite_binding:
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-ECDHE-RSA-AES256-GCM-SHA384"
+      "cipherpriority": "1"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-ECDHE-RSA-AES128-GCM-SHA256"
+      "cipherpriority": "2"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-ECDHE-RSA-AES-256-SHA384"
+      "cipherpriority": "3"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-ECDHE-RSA-AES-128-SHA256"
+      "cipherpriority": "4"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-ECDHE-RSA-AES256-SHA"
+      "cipherpriority": "5"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-ECDHE-RSA-AES128-SHA"
+      "cipherpriority": "6"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-DHE-RSA-AES256-GCM-SHA384"
+      "cipherpriority": "7"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1.2-DHE-RSA-AES128-GCM-SHA256"
+      "cipherpriority": "8"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-DHE-RSA-AES-256-CBC-SHA"
+      "cipherpriority": "9"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-DHE-RSA-AES-128-CBC-SHA"
+      "cipherpriority": "10"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-AES-256-CBC-SHA"
+      "cipherpriority": "11"
+    - "ciphergroupname": "CUSTOM_SECURE"
+      "ciphername": "TLS1-AES-128-CBC-SHA"
+      "cipherpriority": "12"

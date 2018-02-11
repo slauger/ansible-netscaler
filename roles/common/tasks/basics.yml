@@ -1,0 +1,113 @@
+---
+
+- name: disable l3 mode
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsmode"
+    data: '{"nsmode": {"mode": "l3"}}'
+    params:
+      "action": "disable"
+
+- name: disable call home feature
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsfeature"
+    data:
+      nsfeature:
+        feature: ch
+    params:
+      action: disable
+
+- name: Set local DNS record for callhome.citrix.com to avoid an accidentally call home
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnsaddrec:
+        - hostname: "callhome.citrix.com"
+          ipaddress: "192.168.0.0"
+  ignore_errors: true
+
+- name: enable standard features
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsfeature"
+    data: '{"nsfeature": {"feature": "lb cs ssl rewrite responder"}}'
+    params:
+      "action": "enable"
+
+- name: disable external auth for nsroot
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "systemuser"
+    data: '{"systemuser": {"username": "nsroot", "externalauth": "DISABLED"}}'
+
+- name: set system parameters
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "systemparameter"
+    data: '{"systemparameter": {"timeout": "600"}}'
+
+- name: configure basic nsconfig settings
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data: "{{ netscaler_common_config | to_json }}"
+
+- name: best practice tcp settings for nstcp_default_profile
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "nstcpprofile"
+    data: '{"nstcpprofile": {"name": "nstcp_default_profile", "ws": "ENABLED", "sack": "ENABLED", "nagle": "ENABLED"}}'
+
+- name: best practice tcp global settings
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "nstcpparam"
+    data: '{"nstcpparam": {"ws": "ENABLED", "sack": "ENABLED", "nagle": "ENABLED"}}'
+
+# TBD: enable speedy and http 2.0?
+- name: best practice http settings for nshttp_default_profile
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "nshttpprofile"
+    data: '{"nshttpprofile": {"name": "nshttp_default_profile", "dropinvalreqs": "ENABLED", "markhttp09inval": "ENABLED", "markconnreqinval": "ENABLED"}}'
+
+- name: best practie http global settings
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "nshttpparam"
+    data: '{"nshttpparam": {"dropinvalreqs": "ENABLED", "markhttp09inval": "ENABLED", "markconnreqinval": "ENABLED"}}'
+
+# TBD: where to set?
+- name: enable session reliability on HA failover
+  shell: echo

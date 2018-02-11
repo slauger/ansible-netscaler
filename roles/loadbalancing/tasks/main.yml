@@ -1,0 +1,33 @@
+---
+# Loadbalancing for Storefront services
+- name: Storefront Loadbalancing
+  include_tasks: storefront.yml
+  when: netscaler_lb_storefront_certkey is defined and
+        netscaler_lb_storefront_vip is defined and
+        netscaler_lb_storefront_servers is defined 
+
+# Loadbalancing for Session Recording services
+- name: Session Recording Loadbalancing
+  include_tasks: session_recording.yml
+  when: netscaler_lb_session_recording_certkey is defined and
+        netscaler_lb_session_recording_vip is defined and
+        netscaler_lb_session_recording_servers is defined 
+
+# Loadbalancing for AppV services
+- name: AppV Loadbalancing
+  include_tasks: appv.yml
+  when: netscaler_lb_appv_vip is defined and
+        netscaler_lb_appv_servers is defined
+
+# Maintenance website
+# This may a bit more complicated, as we need to be sure that
+# the maintenance service has the same cert as the real LB vServer
+- name: Maintenance service
+  include_tasks: maintenance.yml
+  when: netscaler_lb_maintenance is defined
+
+# Loadbalancing for IVUWM services
+- name: IVUWM Loadbalancing
+  include_tasks: ivuwm.yml
+  when: netscaler_lb_ivuwm_ms_servers is defined or
+        netscaler_lb_ivuwm_ps_servers is defined

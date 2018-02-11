@@ -1,0 +1,90 @@
+---
+
+- name: create secure ssl cipher group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "sslcipher"
+    data: '{"sslcipher": {"ciphergroupname": "CUSTOM_SECURE", "ciphgrpalias": "CUSTOM_SECURE"}}'
+    params:
+      idempotent: "yes"
+
+- name: bind ciphers to ssl cipher group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data: "{{ netscaler_common_sslcipher_sslciphersuite_binding | to_json }}"
+  ignore_errors: true
+
+- name: set basic ssl parameters
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "sslparameter"
+    data: '{"sslparameter": {"strictcachecks": "NO", "denysslreneg": "NONSECURE", "defaultprofile": "ENABLED"}}'
+
+- name: best practice ssl settings for ns_default_ssl_profile_frontend
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "sslprofile"
+    data: '{"sslprofile": {"name": "ns_default_ssl_profile_frontend", "strictcachecks": "NO", "denysslreneg": "NONSECURE"}}'
+
+- name: best practice ssl settings for ns_default_ssl_profile_backend
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "sslprofile"
+    data: '{"sslprofile": {"name": "ns_default_ssl_profile_backend", "strictcachecks": "NO", "denysslreneg": "NONSECURE"}}'
+
+- name: cipher binding for ns_default_ssl_profile_frontend and ns_default_ssl_profile_backend
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "sslprofile_sslciphersuite_binding"
+    data:
+      sslprofile_sslciphersuite_binding:
+        - name: ns_default_ssl_profile_frontend
+          ciphername: CUSTOM_SECURE
+        - name: ns_default_ssl_profile_backend
+          ciphername: CUSTOM_SECURE
+  ignore_errors: true
+
+# todo: check if present to allow run multiple times
+- name: remove DEFAULT cipher group from ns_default_ssl_profile_frontend
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "delete"
+    objecttype: "sslprofile_sslciphersuite_binding"
+    objectname: "ns_default_ssl_profile_frontend"
+    params:
+      "args": "ciphername:DEFAULT"
+    onerror: continue
+  ignore_errors: true
+
+- name: remove DEFAULT_BACKEND cipher group from ns_default_ssl_profile_backend
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "delete"
+    objecttype: "sslprofile_sslciphersuite_binding"
+    objectname: "ns_default_ssl_profile_backend"
+    params:
+      "args": "ciphername:DEFAULT_BACKEND"
+    onerror: continue
+  ignore_errors: true

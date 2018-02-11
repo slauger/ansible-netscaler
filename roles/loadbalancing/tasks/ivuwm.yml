@@ -1,0 +1,90 @@
+---
+
+- name: Create basic configuration for IVUWM Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_http_ivuwm_ms
+          servicetype: HTTP
+          comment: IVUWM Management
+        - servicegroupname: sg_http_ivuwm_ps
+          servicetype: HTTP
+          comment: IVUWM Pers
+      lbmonitor:
+        - monitorname: mon_ivuwm_ms
+          type: HTTP-ECV
+          send: GET /ManagementServer/deployment/dbmonitor.aspx
+          recv: OK
+          lrtm: DISABLED
+          interval: 30
+        - monitorname: mon_ivuwm_ps
+          type: HTTP-ECV
+          send: GET /PersonalizationServer/dbmonitor.aspx
+          recv: OK
+          lrtm: DISABLED
+          interval: 30
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_http_ivuwm_ms
+          monitor_name: mon_ivuwm_ms
+        - servicegroupname: sg_http_ivuwm_ps
+          monitor_name: mon_ivuwm_ps
+      lbvserver:
+        - name: vs_lb_http_ivuwm_ms
+          ipv46: "*"
+          port: 7751
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: IVUWM MS Loadbalancing
+        - name: vs_lb_http_ivuwm_ps
+          ipv46: "*"
+          port: 7771
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: IVUWM PS Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_http_ivuwm_ms
+          servicegroupname: sg_http_ivuwm_ms
+        - name: vs_lb_http_ivuwm_ps
+          servicegroupname: sg_http_ivuwm_ps
+#    params:
+#      'idempotent': 'yes'
+#      'onerror': 'continue'
+
+- name: Bind members to the sg_ivuwm_ms service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_http_ivuwm_ms
+          servername: "{{ item }}"
+          port: 7751
+  with_items: "{{ netscaler_lb_ivuwm_ms_servers }}"
+  when: netscaler_lb_ivuwm_ms_servers is defined
+
+- name: Bind members to the sg_ivuwm_ps service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_http_ivuwm_ps
+          servername: "{{ item }}"
+          port: 7751
+  with_items: "{{ netscaler_lb_ivuwm_ps_servers }}"
+  when: netscaler_lb_ivuwm_ps_servers is defined

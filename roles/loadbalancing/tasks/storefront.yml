@@ -1,0 +1,54 @@
+---
+
+- name: Create basic configuration for Storefront Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_storefront
+          servicetype: SSL
+          comment: Storefront Loadbalancing
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_ssl_storefront
+          monitor_name: https
+      lbvserver:
+        - name: vs_lb_ssl_storefront
+          ipv46: "{{ netscaler_lb_storefront_vip }}"
+          port: 443
+          servicetype: SSL
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: Storefront Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_ssl_storefront
+          servicegroupname: sg_ssl_storefront
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_lb_ssl_storefront
+          certkeyname: "{{ netscaler_lb_storefront_certkey }}"
+#    params:
+#      'idempotent': 'yes'
+#      'onerror': 'continue'
+
+- name: Bind members to the Storefront service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_storefront
+          servername: "{{ item }}"
+          port: 443
+#    params:
+#      'idempotent': 'yes'
+#      'onerror': 'continue'
+  with_items: "{{ netscaler_lb_storefront_servers }}"
+
+      

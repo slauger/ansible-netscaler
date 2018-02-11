@@ -1,0 +1,11 @@
+#- name: upload ssl certificates
+#  when: netscaler_sslcerts_files is defined
+
+- name: install ssl certificates
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data: "{{ netscaler_sslcerts_config | to_json }}"
+  when: netscaler_sslcerts_config is defined

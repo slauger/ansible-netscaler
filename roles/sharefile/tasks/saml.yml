@@ -1,0 +1,8 @@
+---
+
+# TODO: AAA
+#add tm sessionAction act_session_sharefile -SSO ON -ssoCredential PRIMARY -ssoDomain CUSTOMER -homePage "https://${SF_SUBDOMAIN}.sharefile.com/saml/login"
+#add tm sessionPolicy pol_session_sharefile ns_true act_session_sharefile
+#bind authentication vserver vs_aaa_sharefile_auth -policy pol_ldap_sharefile -priority 100
+#bind authentication vserver vs_aaa_sharefile_auth -policy pol_session_sharefile -priority 100
+#bind authentication vserver vs_aaa_sharefile_auth -policy pol_auth_saml_idp_sharefile -priority 100 -gotoPriorityExpression END

@@ -1,0 +1,49 @@
+---
+
+- name: Create audit syslog action and policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      auditsyslogaction:
+        name: act_audit_syslog_default
+        serverip: "{{ netscaler_syslog_server }}"
+        serverport: "{{ netscaler_syslog_port }}"
+        loglevel: "{{ netscaler_syslog_loglevel }}"
+        dateformat: "{{ netscaler_syslog_dateformat }}"
+        logfacility: "{{ netscaler_syslog_logfacility }}"
+        tcp: "{{ netscaler_syslog_tcp }}"
+        acl: "{{ netscaler_syslog_acl }}"
+        timezone: "{{ netscaler_syslog_timezone }}"
+        userdefinedauditlog: "{{ netscaler_syslog_userdefined }}"
+        transport: "{{ netscaler_syslog_transport }}"
+        dns: "{{ netscaler_syslog_dns }}"
+
+- name: Create audit syslog action and policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      auditsyslogpolicy:
+        name: pol_audit_syslog_default
+        rule: "true"
+        action: act_audit_syslog_default
+
+- name: Global binding for audit syslog policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      auditsyslogglobal_auditsyslogpolicy_binding:
+        priority: 100
+        globalbindtype: SYSTEM_GLOBAL
+        policyname: pol_audit_syslog_default

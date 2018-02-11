@@ -1,0 +1,28 @@
+---
+
+- name: Configure SNMP MIB settings
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    method: "put"
+    data:
+      snmpmib:
+        contact: "{{ netscaler_snmp_contact }}"
+        name: "{{ netscaler_snmp_name }}"
+        location: "{{ netscaler_snmp_location }}"
+        customid: "{{ netscaler_snmp_customid }}"
+
+- name: Configure SNMP communities
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      snmpcommunity:
+        communityname: "{{ item }}"
+        permissions: ALL
+  with_items: "{{ netscaler_snmp_communities }}"
+  when: netscaler_snmp_communities is defined

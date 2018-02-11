@@ -64,6 +64,9 @@ from ansible.module_utils.basic import AnsibleModule
 import requests
 import json
 import ast
+import sys
+
+requests.packages.urllib3.disable_warnings()
 
 def run_module():
     module_args = dict(
@@ -110,8 +113,8 @@ def run_module():
       url += '/' + module.params['objectname']
 
     # append params directly to the url var
-    # this is requried because the param "params" will be 
-    # urlencoded requests by default. this will break things.
+    # this is requried because the parameter "params" will be 
+    # urlencoded by requests by default. this will break things.
     if module.params['params'] != None:
         url += '?'
         if isinstance(module.params['params'], dict):
@@ -121,10 +124,10 @@ def run_module():
             url += module.params['params']
 
     # Set Content-Type if required
-    if module.params['data'] != None:
-      headers['Content-Type'] = 'application/json'
+    #if module.params['data'] != None:
+    headers['Content-Type'] = 'application/json'
 
-    # do request via requests
+    # do the nitro call with requests
     try:
       method_callback = getattr(requests, module.params['method'])
       response = method_callback(
@@ -133,31 +136,41 @@ def run_module():
         data=module.params['data'],
         verify=module.params['verify']
       )
+      response.encoding = 'utf-8'
     except requests.exceptions.HTTPError as error:
-        module.fail_json(msg='NITRO API request to ' + url + ' failed (' + str(error) + ')', **result)
+        module.fail_json(msg='NITRO request to ' + url + ' failed (' + str(error) + ')', **result)
     except requests.exceptions.ConnectionError as error:
-        module.fail_json(msg='NITRO API request to ' + url + ' failed (' + str(error) + ')', **result)
+        module.fail_json(msg='NITRO request to ' + url + ' failed (' + str(error) + ')', **result)
     except requests.exceptions.Timeout as error:
-        module.fail_json(msg='NITRO API request to ' + url + ' failed (' + str(error) + ')', **result)
+        module.fail_json(msg='NITRO request to ' + url + ' failed (' + str(error) + ')', **result)
     except requests.exceptions.RequestException as error:
-        module.fail_json(msg='NITRO API request to ' + url + ' failed (' + str(error) + ')', **result)
+        module.fail_json(msg='NITRO request to ' + url + ' failed (' + str(error) + ')', **result)
     except:
-      module.fail_json(msg='NITRO API request to ' + url + ' failed' + url, **result)
+      module.fail_json(msg='NITRO request to ' + url + ' failed' + url, **result)
     
+    # if we're able to parse the result as json, put everything in "result"
     try:
       response_json = response.json()
-      message = response_json['severity'] + ': ' + response_json['message']
-
-      if response_json['severity'] == 'ERROR':
-        module.fail_json(msg=message, **result)
-    except:
-      message = "NITRO API returned HTTP status code " + str(response.status_code)
+      result['message'] = response_json['message']
+      result['original_message'] = response.text
       
-    result['original_message'] = response.text
-    result['message'] = message
+      if response_json['errorcode']:
+        result['errorcode'] = response_json['errorcode']
+    
+      if response_json['severity']:
+        result['severity'] = response_json['severity']
+
+      result['result'] = response_json
+    except:
+      result['message'] = "NITRO API returned HTTP status code " + str(response.status_code)
+      result['original_message'] = response.text
+
     result['changed'] = True
 
-    module.exit_json(**result)
+    if 'severity' in result and result['severity'] == 'ERROR':
+      module.fail_json(msg='NITRO request failed', meta=result)
+    
+    module.exit_json(changed=True, meta=result)
 
 def main():
     run_module()

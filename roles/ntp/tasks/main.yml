@@ -3,6 +3,7 @@
 - name: Configure NTP servers
   netscaler_raw:
     url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
     password: "{{ netscaler_password }}"
     objecttype: "macroapi"
     data:
@@ -15,6 +16,7 @@
 - name: Enable NTP sync
   netscaler_raw:
     url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
     password: "{{ netscaler_password }}"
     objecttype: "ntpsync"
     data: '{"ntpsync":{}}'

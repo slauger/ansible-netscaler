@@ -1,0 +1,39 @@
+---
+
+- name: Creating a generic Content Switching vServer for HTTPS to HTTPS redirects
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      csvserver:
+        name: vs_cs_http_generic_redirect
+        servicetype: HTTP
+        ipv46: "*"
+        port: 80
+        comment: Generic redirect from HTTP to HTTPS 
+      responderaction:
+        name: act_responder_generic_redirect
+        type: redirect
+        target: '"https://" + HTTP.REQ.HOSTNAME.HTTP_URL_SAFE + HTTP.REQ.URL.HTTP_URL_SAFE'
+        responsestatuscode: 301
+      responderpolicy:
+        name: pol_responder_generic_redirect
+        rule: "true"
+        action: act_responder_generic_redirect
+        comment: Generic redirect from HTTP to HTTPS
+
+- name: Binding responder policy to the Content Switching vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      csvserver_responderpolicy_binding:
+        name: vs_cs_http_generic_redirect
+        policyname: pol_responder_generic_redirect
+        priority: 100

@@ -1,0 +1,14 @@
+#- name: upload ssl certificates
+#  when: netscaler_sslcerts_files is defined
+
+- name: configure additional VIPs
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data: "{{ netscaler_common_nsip | to_json }}"
+    params:
+      'idempotent': 'yes'
+  when: netscaler_common_nsip is defined

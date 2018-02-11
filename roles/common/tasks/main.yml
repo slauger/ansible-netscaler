@@ -1,0 +1,11 @@
+---
+
+- include_tasks: basics.yml
+
+- include_tasks: nsip.yml
+  when: netscaler_common_nsip is defined
+
+- include_tasks: sshkeys.yml
+  when: netscaler_common_sshkeys is defined
+
+- include_tasks: ssl.yml

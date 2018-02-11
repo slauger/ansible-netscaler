@@ -1,0 +1,8 @@
+---
+
+netscaler_ldap_port: 636
+netscaler_ldap_loginname: 'sAMAccountName'
+netscaler_ldap_ssoattribute: 'sAMAccountName'
+netscaler_ldap_filter: 'objectClass=user'
+netscaler_ldap_sectype: SSL
+netscaler_ldap_hostname: localhost

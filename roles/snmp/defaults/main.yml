@@ -1,0 +1,6 @@
+---
+
+netscaler_snmp_contact: NetScaler Admin
+netscaler_snmp_name: NetScaler
+netscaler_snmp_location: Default
+netscaler_snmp_customid: 1

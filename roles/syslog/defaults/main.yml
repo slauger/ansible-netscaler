@@ -1,0 +1,12 @@
+---
+
+netscaler_syslog_loglevel: ERROR
+netscaler_syslog_port: 514
+netscaler_syslog_dateformat: DDMMYYYY
+netscaler_syslog_logfacility: 
+netscaler_syslog_tcp: NONE
+netscaler_syslog_acl: DISABLED
+netscaler_syslog_timezone: LOCAL_TIME
+netscaler_syslog_userdefined: "NO"
+netscaler_syslog_transport: UDP
+netscaler_syslog_dns: DISABLED

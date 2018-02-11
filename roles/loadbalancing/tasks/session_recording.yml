@@ -1,0 +1,54 @@
+---
+
+- name: Create basic configuration for Session Recording Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_recorder
+          servicetype: SSL
+          comment: Session Recording
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_ssl_recorder
+          monitor_name: https
+      lbvserver:
+        - name: vs_lb_ssl_recorder
+          ipv46: "{{ netscaler_lb_session_recording_vip }}"
+          port: 443
+          servicetype: SSL
+          lbmethod: LEASTBANDWIDTH
+          persistencetype: SOURCEIP
+          timeout: 10
+          comment: Session Recording Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_ssl_recorder
+          servicegroupname: sg_ssl_recorder
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_lb_ssl_recorder
+          certkeyname: "{{ netscaler_lb_session_recording_certkey }}"
+#    params:
+#      'idempotent': 'yes'
+#      'onerror': 'continue'
+
+- name: Bind members to the Session Recording service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_recorder
+          servername: "{{ item }}"
+          port: 443
+#    params:
+#      'idempotent': 'yes'
+#      'onerror': 'continue'
+  with_items: "{{ netscaler_lb_session_recording_servers }}"
+
+      
