@@ -1,0 +1,92 @@
+---
+
+- name: Create secondary GSLB vServer and service
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbvserver:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_passive"
+          servicetype: "{{ outer_item.protocol }}"
+          iptype: "{{ outer_item.iptype | default('IPV4') }}"
+          dnsrecordtype: "{{ outer_item.dnsrecordtype | default('A') }}"
+          lbmethod: "{{ outer_item.lbmethod | default('LEASTCONNECTION') }}"
+      gslbservice:
+        - servicename: "svc_gslb_{{ outer_item.protocol }}_{{ outer_item.name }}_passive"
+          sitename: "{{ item.sitename }}"
+          ip: "{{ item.ip }}"
+          port: "{{ item.port | default(443) }}"
+          servicetype: "{{ item.servicetype | default(outer_item.protocol) }}"
+  with_items: "{{ outer_item.secondary }}"
+
+- name: Bind service to secondary GSLB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbvserver_gslbservice_binding:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_passive"
+          servicename: "svc_gslb_{{ outer_item.protocol }}_{{ outer_item.name }}_passive"
+  with_items: "{{ outer_item.secondary }}"
+
+- name: Create primary GSLB vServer and service
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbvserver:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_active"
+          servicetype: "{{ outer_item.protocol }}"
+          iptype: "{{ outer_item.iptype | default('IPV4') }}"
+          dnsrecordtype: "{{ outer_item.dnsrecordtype | default('A') }}"
+          lbmethod: "{{ outer_item.lbmethod | default('LEASTCONNECTION') }}"
+      gslbservice:
+        - servicename: "svc_gslb_{{ outer_item.protocol }}_{{ outer_item.name }}_active"
+          sitename: "{{ item.sitename }}"
+          ip: "{{ item.ip }}"
+          port: "{{ item.port | default(443) }}"
+          servicetype: "{{ item.servicetype | default(outer_item.protocol) }}"
+  with_items: "{{ outer_item.primary }}"
+
+- name: Configure backup vServer to primary GSLB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: put
+    objecttype: macroapi
+    data:
+      gslbvserver:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_active"
+          backupvserver: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_passive"
+
+- name: Bind service to primary GSLB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbvserver_gslbservice_binding:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_active"
+          servicename: "svc_gslb_{{ outer_item.protocol }}_{{ outer_item.name }}_active"
+  with_items: "{{ outer_item.primary }}"
+
+- name: Bind DNS domains to the primary GSLB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbvserver_domain_binding:
+        - name: "vs_gslb_{{ outer_item.protocol }}_{{ outer_item.name}}_active"
+          domainname: "{{ item }}"
+          ttl: 5
+  with_items: "{{ outer_item.domains }}"

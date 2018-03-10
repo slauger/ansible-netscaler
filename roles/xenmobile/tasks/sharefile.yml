@@ -1,0 +1,36 @@
+---
+
+- name: Create SAML SSO configuration for ShareFile 
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      authenticationsamlidpprofile:
+        - name: profile_auth_saml_idp_xm_sharefile
+          samlspcertname: "{{ netscaler_sharefile_saml_sp_cert }}"
+          samlidpcertname: "{{ netscaler_sharefile_saml_idp_cert }}"
+          assertionconsumerserviceurl: "https://{{ netscaler_sharefile_cloud_domain }}/saml/acs"
+          samlissuername: "https://{{ netscaler_sharefile_domain }}"
+          audience: "https://{{ netscaler_sharefile_cloud_domain }}"
+          rejectunsignedrequests: "OFF"
+          nameidexpr: HTTP.REQ.USER.ATTRIBUTE(1)
+      authenticationsamlidppolicy:
+        - name: pol_auth_saml_idp_xm_sharefile
+          rule: HTTP.REQ.URL.CONTAINS("saml")
+          action: profile_auth_saml_idp_xm_sharefile
+
+- name: Bind SAML IDP policy to VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_authenticationsamlidppolicy_binding:
+        - policy: pol_auth_saml_idp_xm_sharefile
+          name: vs_vpn_xm_mam_gateway
+          priority: 100

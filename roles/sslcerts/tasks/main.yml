@@ -9,3 +9,14 @@
     objecttype: "macroapi"
     data: "{{ netscaler_sslcerts_config | to_json }}"
   when: netscaler_sslcerts_config is defined
+
+- name: link ssl certificates
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data: "{{ netscaler_sslcerts_links | to_json }}"
+    params:
+      action: link
+  when: netscaler_sslcerts_links is defined

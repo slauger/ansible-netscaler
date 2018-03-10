@@ -1,0 +1,49 @@
+---
+
+- name: Create custom portalthemes
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnportaltheme:
+        name: "{{ item.name }}"
+        basetheme: "{{ item.basetheme | default('X1') }}"
+  with_items: "{{ netscaler_portaltheme_themes }}"
+  when: netscaler_portaltheme_themes is defined
+
+- name: Upload portalthemes
+  shell: "[ -d {{ inventory_dir }}/files/themes/{{ item.name }} ] && rsync -av {{ inventory_dir }}/files/themes/{{ item.name }} nsroot@{{ netscaler_ip }}:/var/netscaler/logon/themes/"
+  with_items: "{{ netscaler_portaltheme_themes }}"
+  when: netscaler_portaltheme_themes is defined
+
+- name: Binding themes to VPN vServers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_vpnportaltheme_binding:
+        name: "{{ item.vserver }}"
+        portaltheme: "{{ item.theme }}"
+  with_items: "{{ netscaler_portaltheme_vpn_bindings }}"
+  when: netscaler_portaltheme_vpn_bindings is defined and
+        netscaler_portaltheme_themes is defined
+
+- name: Binding themes to VPN vServers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      authenticationvserver_vpnportaltheme_binding:
+        name: "{{ item.vserver }}"
+        portaltheme: "{{ item.theme }}"
+  with_items: "{{ netscaler_portaltheme_aaa_bindings }}"
+  when: netscaler_portaltheme_aaa_bindings is defined and
+        netscaler_portaltheme_themes is defined

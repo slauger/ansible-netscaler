@@ -1,4 +1,13 @@
 ---
+
+# Generic Loadbalancing config
+- name: Generic Loadbalancing
+  include_tasks: generic.yml
+  with_items: "{{ netscaler_lb_generic }}"
+  when: netscaler_lb_generic is defined
+  loop_control:
+    loop_var: outer_item
+
 # Loadbalancing for Storefront services
 - name: Storefront Loadbalancing
   include_tasks: storefront.yml

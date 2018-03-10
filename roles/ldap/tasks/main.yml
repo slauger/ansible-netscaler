@@ -1,16 +1,67 @@
 ---
 
-- block:
-  - name: Setup LDAP authentication policy
-    netscaler_raw:
-      url: "{{ netscaler_url }}"
-      username: "{{ netscaler_username }}"
-      password: "{{ netscaler_password }}"
-      objecttype: "macroapi"
-      data:
-        authenticationldapaction:
-          name: act_auth_ldap_default
-          serverip: "{{ netscaler_ldap_server }}"
+- name: Setup Loadbalancing for LDAP
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_tcp_ldaps
+          servicetype: SSL_TCP
+          comment: LDAPS Loadbalancing
+      lbvserver:
+        - name: vs_lb_ssl_tcp_ldaps
+          servicetype: SSL_TCP
+          ipv46: "{{ netscaler_ldap_lb_vip }}"
+          port: 636
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: LDAPS Loadbalancing
+        - name: vs_lb_tcp_ldap
+          servicetype: TCP
+          ipv46: "{{ netscaler_ldap_lb_vip }}"
+          port: 389
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: LDAP Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_ssl_tcp_ldaps
+          servicegroupname: sg_ssl_tcp_ldaps
+        - name: vs_lb_tcp_ldap
+          servicegroupname: sg_ssl_tcp_ldaps
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_lb_ssl_tcp_ldaps
+          certkeyname: "{{ netscaler_ldap_certkey }}"
+
+- name: Bind members to the service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_tcp_ldaps
+          servername: "{{ item }}"
+          port: 636
+  with_items: "{{ netscaler_ldap_servers }}"
+  when: netscaler_ldap_servers is defined
+
+- name: Setup LDAP authentication policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      authenticationldapaction:
+        - name: act_auth_ldap_default
+          serverip: "{{ netscaler_ldap_lb_vip }}"
           serverport: "{{ netscaler_ldap_port | default(636) }}"
           authtimeout: 3
           ldapbase: "{{ netscaler_ldap_basedn }}"
@@ -30,49 +81,178 @@
           groupnameidentifier: sAMAccountName
           groupsearchattribute: memberOf
           groupsearchsubattribute: CN
-          email: mail
-          otpsecret:
-        authenticationldappolicy:
-          - name: pol_auth_ldap_default
-            rule: ns_true
-            reqaction: act_auth_ldap_default
-          - name: pol_auth_ldap_default_receiver
-            rule: "REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver"
-            reqaction: act_auth_ldap_default
-          - name: pol_auth_ldap_default_not_receiver
-            rule: "REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver"
-            reqaction: act_auth_ldap_default
+          attribute1: mail
+          attribute2: sAMAccountName
+          attribute3: UserPrincipalName
+#         email: mail
+#         otpsecret:
+        - name: act_auth_ldap_noauth
+          serverip: "{{ netscaler_ldap_lb_vip }}"
+          serverport: "{{ netscaler_ldap_port | default(636) }}"
+          authtimeout: 3
+          ldapbase: "{{ netscaler_ldap_basedn }}"
+          ldapbinddn: "{{ netscaler_ldap_binddn }}"
+          ldapbinddnpassword: "{{ netscaler_ldap_bindpw }}"
+          ldaploginname: "{{ netscaler_ldap_loginname }}"
+          searchfilter: "{{ netscaler_ldap_filter }}"
+          groupattrname: memberOf
+          subattributename: CN
+          sectype: "{{ netscaler_ldap_sectype }}"
+          ssonameattribute: "{{ netscaler_ldap_ssoattribute }}"
+          passwdchange: ENABLED
+          nestedgroupextraction: "ON"
+          maxnestinglevel: 2
+          validateservercert: "NO"
+          ldaphostname: "{{ netscaler_ldap_hostname }}"
+          groupnameidentifier: sAMAccountName
+          groupsearchattribute: memberOf
+          groupsearchsubattribute: CN
+          authentication: "DISABLED"
+          requireuser: "NO"
+          attribute1: mail
+          attribute2: sAMAccountName
+          attribute3: UserPrincipalName
+        - name: act_auth_ldap_noauth_sam
+          serverip: "{{ netscaler_ldap_lb_vip }}"
+          serverport: "{{ netscaler_ldap_port | default(636) }}"
+          authtimeout: 3
+          ldapbase: "{{ netscaler_ldap_basedn }}"
+          ldapbinddn: "{{ netscaler_ldap_binddn }}"
+          ldapbinddnpassword: "{{ netscaler_ldap_bindpw }}"
+          ldaploginname: sAMAccountName
+          searchfilter: "{{ netscaler_ldap_filter }}"
+          groupattrname: memberOf
+          subattributename: CN
+          sectype: "{{ netscaler_ldap_sectype }}"
+          ssonameattribute: "{{ netscaler_ldap_ssoattribute }}"
+          passwdchange: ENABLED
+          nestedgroupextraction: "ON"
+          maxnestinglevel: 2
+          validateservercert: "NO"
+          ldaphostname: "{{ netscaler_ldap_hostname }}"
+          groupnameidentifier: sAMAccountName
+          groupsearchattribute: memberOf
+          groupsearchsubattribute: CN
+          authentication: "DISABLED"
+          requireuser: "NO"
+          attribute1: mail
+          attribute2: sAMAccountName
+          attribute3: UserPrincipalName
+        - name: act_auth_ldap_noauth_upn
+          serverip: "{{ netscaler_ldap_lb_vip }}"
+          serverport: "{{ netscaler_ldap_port | default(636) }}"
+          authtimeout: 3
+          ldapbase: "{{ netscaler_ldap_basedn }}"
+          ldapbinddn: "{{ netscaler_ldap_binddn }}"
+          ldapbinddnpassword: "{{ netscaler_ldap_bindpw }}"
+          ldaploginname: UserPrincipalName
+          searchfilter: "{{ netscaler_ldap_filter }}"
+          groupattrname: memberOf
+          subattributename: CN
+          sectype: "{{ netscaler_ldap_sectype }}"
+          ssonameattribute: "{{ netscaler_ldap_ssoattribute }}"
+          passwdchange: ENABLED
+          nestedgroupextraction: "ON"
+          maxnestinglevel: 2
+          validateservercert: "NO"
+          ldaphostname: "{{ netscaler_ldap_hostname }}"
+          groupnameidentifier: sAMAccountName
+          groupsearchattribute: memberOf
+          groupsearchsubattribute: CN
+          authentication: "DISABLED"
+          requireuser: "NO"
+          attribute1: mail
+          attribute2: sAMAccountName
+          attribute3: UserPrincipalName
+      authenticationldappolicy:
+        - name: pol_auth_ldap_default
+          rule: ns_true
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_receiver
+          rule: "REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver"
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_not_receiver
+          rule: "REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver"
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_clientcert
+          rule: REQ.SSL.CLIENT.CERT EXISTS
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_not_clientcert
+          rule: REQ.SSL.CLIENT.CERT NOTEXISTS
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_int
+          rule: REQ.IP.SOURCEIP == 10.0.0.0 -netmask 255.0.0.0 || REQ.IP.SOURCEIP == 172.16.0.0 -netmask 255.240.0.0 || REQ.IP.SOURCEIP == 192.168.0.0 -netmask 255.255.0.0
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_default_ext
+          rule: REQ.IP.SOURCEIP != 10.0.0.0 -netmask 255.0.0.0 && REQ.IP.SOURCEIP != 172.16.0.0 -netmask 255.240.0.0 && REQ.IP.SOURCEIP != 192.168.0.0 -netmask 255.255.0.0
+          reqaction: act_auth_ldap_default
+        - name: pol_auth_ldap_noauth
+          rule: ns_true
+          reqaction: act_auth_ldap_noauth
+        - name: pol_auth_ldap_noauth_sam
+          rule: ns_true
+          reqaction: act_auth_ldap_noauth_sam
+        - name: pol_auth_ldap_noauth_upn
+          rule: ns_true
+          reqaction: act_auth_ldap_noauth_upn
 
-  - name: Add system groups and bind superuser policy
-    netscaler_raw:
-      url: "{{ netscaler_url }}"
-      username: "{{ netscaler_username }}"
-      password: "{{ netscaler_password }}"
-      objecttype: "macroapi"
-      data:
-        systemgroup:
-          groupname: "{{ item }}"
-        systemgroup_systemcmdpolicy_binding:
-          priority: 100
-          policyname: superuser
-          groupname: "{{ item }}"
-    with_items: "{{ netscaler_ldap_admin_groups }}"
-    when: netscaler_ldap_admin_groups is defined
+- name: Setup LDAP admin authentication policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      authenticationldapaction:
+        name: act_auth_ldap_admins
+        serverip: "{{ netscaler_ldap_lb_vip }}"
+        serverport: "{{ netscaler_ldap_port | default(636) }}"
+        authtimeout: 3
+        ldapbase: "{{ netscaler_ldap_basedn }}"
+        ldapbinddn: "{{ netscaler_ldap_binddn }}"
+        ldapbinddnpassword: "{{ netscaler_ldap_bindpw }}"
+        ldaploginname: "{{ netscaler_ldap_loginname }}"
+        searchfilter: "{{ netscaler_ldap_filter_admin }}"
+        groupattrname: memberOf
+        subattributename: CN
+        sectype: "{{ netscaler_ldap_sectype }}"
+        ssonameattribute: "{{ netscaler_ldap_ssoattribute }}"
+        passwdchange: ENABLED
+        nestedgroupextraction: "ON"
+        maxnestinglevel: 2
+        validateservercert: "NO"
+        ldaphostname: "{{ netscaler_ldap_hostname }}"
+        groupnameidentifier: sAMAccountName
+        groupsearchattribute: memberOf
+        groupsearchsubattribute: CN
+      authenticationldappolicy:
+        - name: pol_auth_ldap_admins
+          rule: ns_true
+          reqaction: act_auth_ldap_admins
 
-  - name: Bind LDAP authentication policy globally
-    netscaler_raw:
-      url: "{{ netscaler_url }}"
-      username: "{{ netscaler_username }}"
-      password: "{{ netscaler_password }}"
-      objecttype: "macroapi"
-      data:
-        systemglobal_authenticationldappolicy_binding:
-          policyname: pol_auth_ldap_default
-          priority: 100
+- name: Add system groups and bind superuser policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      systemgroup:
+        groupname: "{{ item }}"
+      systemgroup_systemcmdpolicy_binding:
+        priority: 100
+        policyname: superuser
+        groupname: "{{ item }}"
+  with_items: "{{ netscaler_ldap_admin_groups }}"
+  when: netscaler_ldap_admin_groups is defined
 
-  when: netscaler_ldap_server is defined and
-        netscaler_ldap_basedn is defined
-
-      
-
-
+- name: Bind LDAP authentication policy globally
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      systemglobal_authenticationldappolicy_binding:
+        policyname: pol_auth_ldap_admins
+        priority: 100

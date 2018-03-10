@@ -1,0 +1,33 @@
+---
+
+- name: Create vServer and service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_dns_{{ outer_item.name }}
+          servicetype: DNS
+      lbvserver:
+        - name: "vs_lb_dns_{{ outer_item.name }}"
+          servicetype: DNS
+      lbvserver_servicegroup_binding:
+        - name: "vs_lb_dns_{{ outer_item.name }}"
+          servicegroupname: "sg_dns_{{ outer_item.name }}"
+
+- name: Bind members to the service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: "sg_dns_{{ outer_item.name }}"
+          servername: "{{ item }}"
+          port: 53
+  with_items: "{{ outer_item.servers }}"

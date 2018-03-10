@@ -1,0 +1,10 @@
+---
+- name: save configuration
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsconfig"
+    params:
+      "action": "save"
+    data: '{"nsconfig":{}}'

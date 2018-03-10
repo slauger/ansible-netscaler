@@ -1,0 +1,114 @@
+---
+
+- name: enable the required features
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: nsfeature
+    data:
+      nsfeature:
+        feature: aaa
+    params:
+      action: enable
+
+- name: Create basic configuration 
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      authenticationvserver:
+        name: vs_aaa_auth_generic
+        servicetype: SSL
+        authenticationdomain: "{{ netscaler_aaavserver_authdomain }}"
+        comment: Generic AAA vServer
+        maxloginattempts: 10
+        failedlogintimeout: 30
+      tmsessionaction:
+        - name: act_session_aaa_default
+          sso: 'ON'
+          ssocredential: PRIMARY
+          sesstimeout: '60'
+          homepage: "{{ netscaler_aaavserver_homepage }}"
+          ssodomain: "{{ netscaler_aaavserver_ssodomain }}"
+      tmsessionpolicy:
+        - name: pol_session_aaa_default
+          rule: ns_true
+          action: act_session_aaa_default
+
+- name: Binding SSL certificates to AAA vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_aaa_auth_generic
+          certkeyname: "{{ netscaler_aaavserver_certkey }}"
+
+- name: Binding default session policy to AAA vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      authenticationvserver_tmsessionpolicy_binding:
+        - name: vs_aaa_auth_generic
+          policy: pol_session_aaa_default
+          priority: 100
+
+- name: Create content switching actions
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      csaction:
+        - name: act_cs_aaa_generic
+          targetvserver: vs_aaa_auth_generic
+
+- name: Create content switching policies
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      cspolicy:
+        - policyname: pol_cs_aaa_generic
+          rule: "HTTP.REQ.URL.STARTSWITH_ANY(\"aaa_path\") || HTTP.REQ.URL.EQUALS_ANY(\"aaa_url\") || HTTP.REQ.HOSTNAME.EQ(\"{{ netscaler_aaavserver_fqdn }}\")"
+          action: act_cs_aaa_generic
+
+- name: Bind content switching policies to CS vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      csvserver_cspolicy_binding: 
+        - priority: 10
+          name: "{{ netscaler_aaavserver_csvserver }}"
+          policyname: pol_cs_aaa_generic
+          gotopriorityexpression: END
+  when: netscaler_aaavserver_csvserver is defined
+
+- name: Bind LDAP policy to vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      authenticationvserver_authenticationldappolicy_binding:
+        - priority: 100
+          name: vs_aaa_auth_generic
+          policy: "{{ netscaler_aaavserver_ldap_policy }}"

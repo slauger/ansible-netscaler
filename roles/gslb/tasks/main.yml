@@ -1,0 +1,47 @@
+---
+
+- name: Enable GSLB feature
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsfeature"
+    data:
+      nsfeature:
+        feature: GSLB
+    params:
+      action: enable
+
+- name: Create GSLB DNS Listener
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      dnsnameserver:
+        - ip: "{{ item }}"
+          local: "true"
+  with_items: "{{ netscaler_gslb_listener }}"
+  when: netscaler_gslb_listener is defined
+
+- name: Create GSLB sites
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      gslbsite:
+        - sitename: "{{ item.name }}"
+          siteipaddress: "{{ item.ip }}"
+          publicip: "{{ item.publicip | default(item.ip) }}"
+  when: netscaler_gslb_sites is defined
+  with_items: "{{ netscaler_gslb_sites }}"
+
+- name: Create GSLB vServers and services
+  include_tasks: gslb.yml
+  with_items: "{{ netscaler_gslb_services }}"
+  when: netscaler_gslb_services is defined
+  loop_control:
+    loop_var: outer_item

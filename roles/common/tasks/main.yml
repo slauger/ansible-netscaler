@@ -2,6 +2,12 @@
 
 - include_tasks: basics.yml
 
+- include_tasks: dns_lb.yml
+  with_items: "{{ netscaler_common_dns_lb }}"
+  loop_control:
+    loop_var: outer_item
+  when: netscaler_common_dns_lb is defined
+
 - include_tasks: nsip.yml
   when: netscaler_common_nsip is defined
 

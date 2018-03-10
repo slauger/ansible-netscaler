@@ -8,12 +8,6 @@
     method: "post"
     objecttype: "macroapi"
     data:
-      csvserver:
-        name: vs_cs_http_generic_redirect
-        servicetype: HTTP
-        ipv46: "*"
-        port: 80
-        comment: Generic redirect from HTTP to HTTPS 
       responderaction:
         name: act_responder_generic_redirect
         type: redirect
@@ -25,15 +19,34 @@
         action: act_responder_generic_redirect
         comment: Generic redirect from HTTP to HTTPS
 
-- name: Binding responder policy to the Content Switching vServer
-  netscaler_raw:
-    url: "{{ netscaler_url }}"
-    username: "{{ netscaler_username }}"
-    password: "{{ netscaler_password }}"
-    method: "put"
-    objecttype: "macroapi"
-    data:
-      csvserver_responderpolicy_binding:
-        name: vs_cs_http_generic_redirect
-        policyname: pol_responder_generic_redirect
-        priority: 100
+- block:
+  - name: Creating a generic Content Switching vServer for HTTPS to HTTPS redirects
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      method: "post"
+      objecttype: "macroapi"
+      data:
+        csvserver:
+          name: vs_cs_http_301_{{ item }}
+          servicetype: HTTP
+          ipv46: "{{ item }}"
+          port: 80
+          comment: Generic redirect from HTTP to HTTPS 
+    with_items: "{{ netscaler_redirect_vips }}"
+    
+  - name: Binding responder policy to the Content Switching vServer
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      method: "put"
+      objecttype: "macroapi"
+      data:
+        csvserver_responderpolicy_binding:
+          name: vs_cs_http_301_{{ item }}
+          policyname: pol_responder_generic_redirect
+          priority: 100
+    with_items: "{{ netscaler_redirect_vips }}"
+  when: netscaler_redirect_vips is defined

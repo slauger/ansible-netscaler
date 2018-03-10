@@ -36,7 +36,17 @@
     password: "{{ netscaler_password }}"
     method: "put"
     objecttype: "sslprofile"
-    data: '{"sslprofile": {"name": "ns_default_ssl_profile_frontend", "strictcachecks": "NO", "denysslreneg": "NONSECURE"}}'
+    data:
+      sslprofile:
+        - name: ns_default_ssl_profile_frontend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
 
 - name: best practice ssl settings for ns_default_ssl_profile_backend
   netscaler_raw:
@@ -45,7 +55,90 @@
     password: "{{ netscaler_password }}"
     method: "put"
     objecttype: "sslprofile"
-    data: '{"sslprofile": {"name": "ns_default_ssl_profile_backend", "strictcachecks": "NO", "denysslreneg": "NONSECURE"}}'
+    data:
+      sslprofile:
+        - name: ns_default_ssl_profile_backend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          sessreuse: "DISABLED"
+
+# parameter for strictcachecks
+- name: add additional ssl profiles
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      sslprofile:
+        - name: ssl_profile_frontend_sni
+          sslprofiletype: frontend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          snienable: "ENABLED"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
+          #maxage: 31536000
+        - name: ssl_profile_frontend_secure
+          sslprofiletype: frontend
+          ssl3: "DISABLED"
+          tls1: "DISABLED"
+          tls11: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          snienable: "ENABLED"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
+          #maxage: 31536000
+        - name: ssl_profile_frontend_clientcert_req
+          sslprofiletype: frontend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          clientauth: "ENABLED"
+          clientcert: "Mandatory"
+          clientauthuseboundcachain: "ENABLED"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
+          #maxage: 31536000
+        - name: ssl_profile_frontend_clientcert_opt
+          sslprofiletype: frontend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          clientauth: "ENABLED"
+          clientcert: "Optional"
+          clientauthuseboundcachain: "ENABLED"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
+          #maxage: 31536000
+        - name: ssl_profile_frontend_strict_sni
+          sslprofiletype: frontend
+          ssl3: "DISABLED"
+          strictcachecks: "NO"
+          denysslreneg: "NONSECURE"
+          dh: "ENABLED"
+          dhfile: "/nsconfig/ssl/ECDHE.key"
+          sessreuse: "DISABLED"
+          snienable: "ENABLED"
+          dropreqwithnohostheader: "YES"
+          # NetScaler 12.0
+          #hsts: "ENABLED"
+          #maxage: 31536000
 
 - name: cipher binding for ns_default_ssl_profile_frontend and ns_default_ssl_profile_backend
   netscaler_raw:
@@ -60,20 +153,37 @@
           ciphername: CUSTOM_SECURE
         - name: ns_default_ssl_profile_backend
           ciphername: CUSTOM_SECURE
+        - name: ssl_profile_frontend_sni
+          ciphername: CUSTOM_SECURE
+        - name: ssl_profile_frontend_secure
+          ciphername: CUSTOM_SECURE
+        - name: ssl_profile_frontend_clientcert_req
+          ciphername: CUSTOM_SECURE
+        - name: ssl_profile_frontend_clientcert_opt
+          ciphername: CUSTOM_SECURE
+        - name: ssl_profile_frontend_strict_sni
+          ciphername: CUSTOM_SECURE
   ignore_errors: true
 
 # todo: check if present to allow run multiple times
-- name: remove DEFAULT cipher group from ns_default_ssl_profile_frontend
+- name: remove DEFAULT cipher group from frontend profiles
   netscaler_raw:
     url: "{{ netscaler_url }}"
     username: "{{ netscaler_username }}"
     password: "{{ netscaler_password }}"
     method: "delete"
     objecttype: "sslprofile_sslciphersuite_binding"
-    objectname: "ns_default_ssl_profile_frontend"
+    objectname: "{{ item }}"
     params:
       "args": "ciphername:DEFAULT"
     onerror: continue
+  with_items:
+    - ns_default_ssl_profile_frontend
+    - ssl_profile_frontend_sni
+    - ssl_profile_frontend_secure
+    - ssl_profile_frontend_clientcert_req
+    - ssl_profile_frontend_clientcert_opt
+    - ssl_profile_frontend_strict_sni
   ignore_errors: true
 
 - name: remove DEFAULT_BACKEND cipher group from ns_default_ssl_profile_backend
@@ -88,3 +198,52 @@
       "args": "ciphername:DEFAULT_BACKEND"
     onerror: continue
   ignore_errors: true
+
+- name: Configure HSTS rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      rewriteaction:
+        name: act_rewrite_inject_hsts_header
+        type: insert_http_header
+        target: Strict-Transport-Security
+        stringbuilderexpr: '"max-age=31536000"'
+      rewritepolicy:
+        name: pol_rewrite_inject_hsts_header
+        rule: "true"
+        action: act_rewrite_inject_hsts_header
+
+- name: Global Binding for HSTS rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: macroapi
+    data:
+      rewriteglobal_rewritepolicy_binding:
+        policyname: pol_rewrite_inject_hsts_header
+        priority: 900
+
+#- name: Configure CRLs
+#  sslcrl
+#    crlname
+#    cacert
+#    crlpath
+#    inform
+#    refresh: ENABLED
+#    method: HTTP
+#    server: 
+#    url: 
+#    interval: DAILY
+
+#- name: Configure OCSP
+#  sslocspresponder
+#    name: 
+#    url
+#    cache: ENABLED
+#    cachetimeout:
+#    respondercert

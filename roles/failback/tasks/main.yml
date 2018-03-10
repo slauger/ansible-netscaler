@@ -1,0 +1,119 @@
+---
+
+- name: Create vServers and service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      servicegroup:
+        - servicegroupname: sg_http_failback
+          servicetype: HTTP
+      lbvserver:
+        - name: vs_lb_http_failback
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+        - name: vs_lb_ssl_failback
+          servicetype: SSL
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_http_failback
+          servicegroupname: sg_http_failback
+        - name: vs_lb_ssl_failback
+          servicegroupname: sg_http_failback
+
+- name: Bind members to the service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: "sg_http_failback"
+          servername: "{{ item }}"
+          port: 80
+  with_items: "{{ netscaler_failback_servers }}"
+
+- name: Binding SSL certificates to the vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_lb_ssl_failback
+          certkeyname: "{{ item.name }}"
+          snicert: "{{ item.snicert | default(false) }}"
+  with_items: "{{ netscaler_failback_certkey }}"
+  when: netscaler_failback_certkey
+  
+
+- name: Configure failback HTTP response code rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      rewriteaction:
+        - name: act_rewrite_http_status_503
+          type: replace
+          target: HTTP.RES.STATUS
+          stringbuilderexpr: 503
+      rewritepolicy:
+        - name: pol_rewrite_http_status_503
+          rule: "true"
+          action: act_rewrite_http_status_503
+
+- name: Policy binding for failback HTTP response code rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: macroapi
+    data:
+      lbvserver_rewritepolicy_binding:
+        - name: vs_lb_http_failback
+          policyname: pol_rewrite_inject_hsts_header
+          bindpoint: RESPONSE
+          priority: 900
+        - name: vs_lb_ssl_failback
+          policyname: pol_rewrite_inject_hsts_header
+          bindpoint: RESPONSE
+          priority: 900
+
+- name: Bind failback website to HTTP LB vServers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: put
+    objecttype: macroapi
+    data:
+      lbvserver:
+        - name: "{{ item }}"
+          backupvserver: vs_lb_http_failback
+  with_items: "{{ netscaler_failback_vservers_http }}"
+  when: netscaler_failback_vservers_http is defined
+
+- name: Bind failback website to SSL LB vServers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: put
+    objecttype: macroapi
+    data:
+      lbvserver:
+        - name: "{{ item }}"
+          backupvserver: vs_lb_ssl_failback
+  with_items: "{{ netscaler_failback_vservers_ssl }}"
+  when: netscaler_failback_vservers_ssl is defined

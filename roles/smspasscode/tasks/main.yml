@@ -1,5 +1,44 @@
 ---
 
+- name: Setup Loadbalancing for RADIUS
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_radius_smspasscode
+          servicetype: RADIUS
+          comment: RADIUS Loadbalancing
+      lbvserver:
+        - name: vs_lb_radius_smspasscode
+          servicetype: RADIUS
+          ipv46: "{{ netscaler_smspasscode_vip }}"
+          port: 1812
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: RADIUS Loadbalancing
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_radius_smspasscode
+          servicegroupname: sg_radius_smspasscode
+
+- name: Bind members to the service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_radius_smspasscode
+          servername: "{{ item }}"
+          port: 1812
+  with_items: "{{ netscaler_smspasscode_servers }}"
+  when: netscaler_smspasscode_servers is defined
+
 - block:
   - name: Setup RADIUS authentication policy for SMS Passcode
     netscaler_raw:
@@ -9,30 +48,47 @@
       objecttype: "macroapi"
       data:
         authenticationradiusaction:
-          name: act_auth_radius_smspasscode
-          serverip: "{{ netscaler_smspasscode_server }}"
+          name: act_auth_radius_smspc
+          serverip: "{{ netscaler_smspasscode_vip }}"
           serverport: 1812
-          authtimeout: 3
+          authtimeout: 5
           radkey: "{{ netscaler_smspasscode_radkey }}"
           radnasip: ENABLED
           radnasid: NetScaler
           radvendorid: "1"
           radattributetype: 99
-          radgroupsprefix: CTXUserGroups=
-          radgroupseparator: ","
+          radgroupsprefix: CTXSUserGroups=
+          radgroupseparator: ";"
           accounting: "ON"
           callingstationid: ENABLED
         authenticationradiuspolicy:
-          - name: pol_auth_radius_smspasscode
+          - name: pol_auth_radius_smspc
             rule: ns_true
-            reqaction: act_auth_radius_smspasscode
-          - name: pol_auth_radius_smspasscode_receiver
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_receiver
             rule: "REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver"
-            reqaction: act_auth_radius_smspasscode
-          - name: pol_auth_radius_smspasscode_not_receiver
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_not_receiver
             rule: "REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver"
-            reqaction: act_auth_radius_smspasscode
-  # maybe optional polcies right here
-  when: netscaler_smspasscode_server is defined and
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_clientcert
+            rule: REQ.SSL.CLIENT.CERT EXISTS
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_not_clientcert
+            rule: REQ.SSL.CLIENT.CERT NOTEXISTS
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_int
+            rule: REQ.IP.SOURCEIP == 10.0.0.0 -netmask 255.0.0.0 || REQ.IP.SOURCEIP == 172.16.0.0 -netmask 255.240.0.0 || REQ.IP.SOURCEIP == 192.168.0.0 -netmask 255.255.0.0
+            reqaction: act_auth_radius_smspc
+          - name: pol_auth_radius_smspc_ext
+            rule: REQ.IP.SOURCEIP != 10.0.0.0 -netmask 255.0.0.0 && REQ.IP.SOURCEIP != 172.16.0.0 -netmask 255.240.0.0 && REQ.IP.SOURCEIP != 192.168.0.0 -netmask 255.255.0.0
+            reqaction: act_auth_radius_smspc
+  when: netscaler_smspasscode_servers is defined and
         netscaler_smspasscode_radkey is defined
 
+- name: Build SSO traffic policy to support multi domain setups
+  include_tasks: sso.yml
+  loop_control:
+    loop_var: outer_item
+  with_items: "{{ netscaler_smspasscode_samsso }}"
+  when: netscaler_smspasscode_samsso is defined

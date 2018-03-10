@@ -1,5 +1,8 @@
 ---
 
+# xenmobile sharefile policy
+# proxy policies
+
 - name: enable the required features
   netscaler_raw:
     url: "{{ netscaler_url }}"
@@ -67,6 +70,19 @@
           maxloginattempts: '10'
           failedlogintimeout: '30'
 
+- name: Binding SSL certificates to vServers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_lb_ssl_mam
+          certkeyname: "{{ netscaler_xenmobile_certkey }}"
+        - vservername: vs_vpn_xm_mam_gateway
+          certkeyname: "{{ netscaler_xenmobile_certkey }}"
+
 - name: Binding XenMobile servers to the service groups
   netscaler_raw:
     url: "{{ netscaler_url }}"
@@ -91,6 +107,29 @@
   with_items: "{{ netscaler_xenmobile_servers }}"
   when: netscaler_xenmobile_servers is defined
 
+# dont know if this is really required...
+#- name: Create persistency group
+#  netscaler_raw:
+#    url: "{{ netscaler_url }}"
+#    username: "{{ netscaler_username }}"
+#    password: "{{ netscaler_password }}"
+#    objecttype: "macroapi"
+#    data:
+
+- name: Binding additional STA servers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_staserver_binding:
+        - name: vs_vpn_xm_mam_gateway
+          staaddresstype: IPV4
+          staserver: "{{ item }}"
+  with_items: "{{ netscaler_xenmobile_sta_servers }}"
+  when: netscaler_xenmobile_sta_servers is defined
+
 - name: Creating session policies and profiles
   netscaler_raw:
     url: "{{ netscaler_url }}"
@@ -113,7 +152,7 @@
           clientlessvpnmode: 'ON'
           clientlessmodeurlencoding: TRANSPARENT
           securebrowse: ENABLED
-          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
+          storefronturl: "https://{{ netscaler_xenmobile_storefront_fqdn }}"
         - name: act_session_xenmobile_web
           splitdns: BOTH
           sesstimeout: '1440'
@@ -128,9 +167,9 @@
           clientlessvpnmode: 'ON'
           clientlessmodeurlencoding: TRANSPARENT
           securebrowse: ENABLED
-          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
-          homepage: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
-          wihome: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
+          storefronturl: "https://{{ netscaler_xenmobile_storefront_fqdn }}"
+          homepage: "{{ netscaler_xenmobile_web_homepage | default('https://{{ netscaler_xenmobile_storefront_fqdn }}/Citrix/StoreWeb') }}"
+          wihome: "https://{{ netscaler_xenmobile_storefront_fqdn }}/Citrix/StoreWeb"
         - name: act_session_xenmobile_ag
           splitdns: BOTH
           sesstimeout: '1440'
@@ -145,8 +184,8 @@
           clientlessvpnmode: 'OFF'
           clientlessmodeurlencoding: TRANSPARENT
           securebrowse: ENABLED
-          storefronturl: "https://{{ netscaler_xenmobile_fqdn }}:8443"
-          homepage: "https://{{ netscaler_xenmobile_fqdn }}:8443/Citrix/StoreWeb"
+          storefronturl: "https://{{ netscaler_xenmobile_storefront_fqdn }}"
+          homepage: "https://{{ netscaler_xenmobile_storefront_fqdn }}/Citrix/StoreWeb"
       vpnsessionpolicy:
         - name: pol_session_xenmobile_os
           rule: REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver && REQ.HTTP.HEADER X-Citrix-Gateway EXISTS
@@ -260,8 +299,11 @@
     password: "{{ netscaler_password }}"
     objecttype: "macroapi"
     data:
-        vpnglobal_domain_binding:
-          - intranetdomain: "{{ item }}"
+      vpnglobal_domain_binding:
+        - intranetdomain: "{{ item }}"
+      policypatset_pattern_binding:
+        - string: "{{ item }}"
+          name: ns_cvpn_default_inet_domains
   with_items: "{{ netscaler_xenmobile_intranet_domains }}"
   when: netscaler_xenmobile_intranet_domains is defined
 
@@ -274,6 +316,34 @@
     data:
       vpnvserver_authenticationldappolicy_binding:
         - name: vs_vpn_xm_mam_gateway
-          policy: "{{ item }}"
+          policy: "{{ item.name }}"
+          secondary: "{{ item.secondary | default(false) }}"
   with_items: "{{ netscaler_xenmobile_ldap_policies }}"
   when: netscaler_xenmobile_ldap_policies is defined
+
+- name: Binding RADIUS authentication policies to the VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_authenticationradiuspolicy_binding:
+        - name: vs_vpn_xm_mam_gateway
+          policy: "{{ item.name }}"
+          secondary: "{{ item.secondary | default(false) }}"
+  with_items: "{{ netscaler_xenmobile_radius_policies }}"
+  when: netscaler_xenmobile_radius_policies is defined
+
+#- name: Binding VPN portal theme to the vServer
+#  netscaler_raw:
+#    url: "{{ netscaler_url }}"
+#    username: "{{ netscaler_username }}"
+#    password: "{{ netscaler_password }}"
+#    objecttype: "macroapi"
+#    data:
+#      vpnvserver_vpnportaltheme_binding:
+#        - name: vs_vpn_xm_mam_gateway
+#          portaltheme: X1
+
+- include_tasks: sharefile.yml

@@ -1,0 +1,42 @@
+---
+
+- name: Configure sAMAccountName logon policies for SMSPasscode
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpntrafficaction:
+        - name: "act_traffic_smspc_sso_{{ outer_item.name }}"
+          qual: http
+          sso: "ON"
+          userexpression: HTTP.REQ.USER.LOGIN_NAME + "@{{ outer_item.domain }}"
+      vpntrafficpolicy:
+        - name: "pol_traffic_smspc_sso_{{ outer_item.name }}"
+          rule: ns_true
+          action: "act_traffic_smspc_sso_{{ outer_item.name }}"
+
+- name: Create AAA groups for policy binding
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      aaagroup:
+        groupname: "{{ item }}"
+  with_items: "{{ outer_item.groups }}"
+
+- name: Bind sAMAccountName logon policy to group selectors
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      aaagroup_vpntrafficpolicy_binding:
+        groupname: "{{ item }}"
+        policy: "pol_traffic_smspc_sso_{{ outer_item.name }}"
+        priority: 900
+  with_items: "{{ outer_item.groups }}"

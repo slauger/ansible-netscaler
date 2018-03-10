@@ -1,0 +1,16 @@
+---
+
+- hosts: netscaler
+  roles:
+    - config_clear
+    - servers
+    - common
+    - sslcerts
+    - snmp
+    - syslog
+    - ldap
+    - ntp
+    - redirect
+    - portaltheme
+    - config_save
+ 

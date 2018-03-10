@@ -34,15 +34,53 @@
           ipaddress: "192.168.0.0"
   ignore_errors: true
 
+- name: Configure DNS servers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnsnameserver:
+        - ip: "{{ item }}"
+  with_items: "{{ netscaler_common_dns_servers }}"
+
+- name: Configure DNS suffix
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnssuffix:
+        - dnssuffix: "{{ item }}"
+  with_items: "{{ netscaler_common_dns_suffix }}"
+  when: netscaler_common_dns_suffix is defined
+
 - name: enable standard features
   netscaler_raw:
     url: "{{ netscaler_url }}"
     username: "{{ netscaler_username }}"
     password: "{{ netscaler_password }}"
     objecttype: "nsfeature"
-    data: '{"nsfeature": {"feature": "lb cs ssl rewrite responder"}}'
+    data:
+      nsfeature:
+        feature: "{{ netscaler_common_features }}"
     params:
-      "action": "enable"
+      action: enable
+  
+- name: enable standard modes
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "nsmode"
+    data:
+      nsmode:
+        mode: "{{ netscaler_common_modes }}"
+    params:
+      action: enable
+  when: netscaler_common_modes is defined
 
 - name: disable external auth for nsroot
   netscaler_raw:
@@ -89,7 +127,6 @@
     objecttype: "nstcpparam"
     data: '{"nstcpparam": {"ws": "ENABLED", "sack": "ENABLED", "nagle": "ENABLED"}}'
 
-# TBD: enable speedy and http 2.0?
 - name: best practice http settings for nshttp_default_profile
   netscaler_raw:
     url: "{{ netscaler_url }}"
@@ -97,7 +134,30 @@
     password: "{{ netscaler_password }}"
     method: "put"
     objecttype: "nshttpprofile"
-    data: '{"nshttpprofile": {"name": "nshttp_default_profile", "dropinvalreqs": "ENABLED", "markhttp09inval": "ENABLED", "markconnreqinval": "ENABLED"}}'
+    data:
+      nshttpprofile:
+        name: nshttp_default_profile
+        dropinvalreqs: "ENABLED"
+        markhttp09inval: "ENABLED"
+        markconnreqinval: "ENABLED"
+        conmultiplex: "DISABLED"
+        http2: "ENABLED"
+
+- name: best practice http settings for nshttp_default_strict_validation
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "nshttpprofile"
+    data:
+      nshttpprofile:
+        name: nshttp_default_profile
+        dropinvalreqs: "ENABLED"
+        markhttp09inval: "ENABLED"
+        markconnreqinval: "ENABLED"
+        conmultiplex: "DISABLED"
+        http2: "ENABLED"
 
 - name: best practie http global settings
   netscaler_raw:
@@ -106,8 +166,37 @@
     password: "{{ netscaler_password }}"
     method: "put"
     objecttype: "nshttpparam"
-    data: '{"nshttpparam": {"dropinvalreqs": "ENABLED", "markhttp09inval": "ENABLED", "markconnreqinval": "ENABLED"}}'
+    data:
+      nshttpparam:
+        dropinvalreqs: "ENABLED"
+        markhttp09inval: "ENABLED"
+        markconnreqinval: "ENABLED"
+        #http2serverside: "ON"
+        conmultiplex: "DISABLED"
+
+- name: Add additional HTTP profiles
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      nshttpprofile:
+        - name: profile_http_legacy
+          dropextracrlf: "ENABLED"
+          conmultiplex: "DISABLED"
+          dropinvalreqs: "ENABLED"
+          markhttp09inval: "ENABLED"
+          markconnreqinval: "ENABLED"
+          http2: "DISABLED"
+        - name: profile_http_multiplexing
+          dropextracrlf: "ENABLED"
+          conmultiplex: "ENABLED"
+          dropinvalreqs: "ENABLED"
+          markhttp09inval: "ENABLED"
+          markconnreqinval: "ENABLED"
+          http2: "DISABLED"
 
 # TBD: where to set?
 - name: enable session reliability on HA failover
-  shell: echo
+  shell: echo ...

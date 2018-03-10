@@ -1,0 +1,7 @@
+---
+
+- include_tasks: simple.yml
+  with_items: "{{ netscaler_csvserver_simple }}"
+  loop_control:
+    loop_var: outer_item
+  when: netscaler_csvserver_simple is defined

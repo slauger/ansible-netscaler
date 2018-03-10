@@ -1,0 +1,168 @@
+---
+
+- name: enable the required features
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: nsfeature
+    data:
+      nsfeature:
+        feature: lb ssl sslvpn
+    params:
+      action: enable
+
+- name: Creating NetScaler Gateway configuration
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_ssl_storefront_gw
+          servicetype: SSL
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_ssl_storefront_gw
+          monitor_name: tcp
+      lbvserver:
+        - name: vs_lb_ssl_storefront_gw
+          ipv46: "{{ netscaler_gateway_storefront_vip }}"
+          port: '443'
+          servicetype: SSL
+          persistencetype: SOURCEIP
+          timeout: '5'
+      lbvserver_servicegroup_binding:
+        - servicegroupname: sg_ssl_storefront_gw
+          name: vs_lb_ssl_storefront_gw
+      vpnvserver:
+        - name: vs_vpn_gateway
+          servicetype: SSL
+          ipv46: "{{ netscaler_gateway_vip }}"
+          port: '443'
+          icaonly: "ON"
+          maxloginattempts: '10'
+          failedlogintimeout: '30'
+
+- name: Binding SSL certificates to vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_vpn_gateway
+          certkeyname: "{{ netscaler_gateway_certkey }}"
+        - vservername: vs_lb_ssl_storefront_gw
+          certkeyname: "{{ netscaler_gateway_certkey }}"
+
+- name: Binding Storefront servers to the service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_ssl_storefront_gw
+          servername: "{{ item }}"
+          port: '443'
+  with_items: "{{ netscaler_gateway_storefront_servers }}"
+  when: netscaler_xenmobile_servers is defined
+
+- name: Set local DNS record for Storefront
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnsaddrec:
+        - hostname: "{{ netscaler_gateway_storefront_fqdn }}"
+          ipaddress: "{{ netscaler_gateway_storefront_vip }}"
+  ignore_errors: true
+
+- name: Binding STA servers
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_staserver_binding:
+        - name: vs_vpn_gateway
+          staaddresstype: IPV4
+          staserver: "{{ item }}"
+  with_items: "{{ netscaler_gateway_sta_servers }}"
+  when: netscaler_gateway_sta_servers is defined
+
+- name: Creating session policies and profiles
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnsessionaction:
+        - name: act_session_gateway_os
+          splittunnel: 'OFF'
+          transparentinterception: 'OFF'
+          defaultauthorizationaction: ALLOW
+          sso: 'ON'
+          icaproxy: 'ON'
+          wihome: "https://{{ netscaler_gateway_storefront_fqdn }}/Citrix/{{ netscaler_gateway_store }}Web"
+          clientchoices: 'OFF'
+          clientlessvpnmode: 'OFF'
+          storefronturl: "https://{{ netscaler_gateway_storefront_fqdn }}"
+        - name: act_session_gateway_web
+          splittunnel: 'OFF'
+          transparentinterception: 'OFF'
+          defaultauthorizationaction: ALLOW
+          sso: 'ON'
+          homepage: https://{{ netscaler_gateway_storefront_fqdn }}/Citrix/StoreWeb
+          icaproxy: 'ON'
+          wihome: "https://{{ netscaler_gateway_storefront_fqdn }}/Citrix/{{ netscaler_gateway_store }}Web"
+          clientchoices: 'OFF'
+          clientlessvpnmode: 'ON'
+      vpnsessionpolicy:
+        - name: pol_session_gateway_os
+          rule: REQ.HTTP.HEADER User-Agent CONTAINS CitrixReceiver
+          action: act_session_gateway_os
+        - name: pol_session_gateway_web
+          rule: REQ.HTTP.HEADER User-Agent NOTCONTAINS CitrixReceiver
+          action: act_session_gateway_web
+      vpnvserver_vpnsessionpolicy_binding:
+        - name: vs_vpn_gateway
+          priority: '100'
+          policy: pol_session_gateway_os
+        - name: vs_vpn_gateway
+          priority: '200'
+          policy: pol_session_gateway_web
+    onerror: "continue"
+
+- name: Binding LDAP authentication policies to the VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_authenticationldappolicy_binding:
+        - name: vs_vpn_gateway
+          policy: "{{ item }}"
+  with_items: "{{ netscaler_gateway_ldap_policies }}"
+  when: netscaler_gateway_ldap_policies is defined
+
+- name: Binding RADIUS authentication policies to the VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      vpnvserver_authenticationradiuspolicy_binding:
+        - name: vs_vpn_gateway
+          policy: "{{ item }}"
+  with_items: "{{ netscaler_gateway_radius_policies }}"
+  when: netscaler_gateway_radius_policies is defined

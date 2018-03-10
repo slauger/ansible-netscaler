@@ -1,5 +1,7 @@
 ---
 
+netscaler_common_features: lb cs ssl rewrite responder
+
 # defaults file for netscaler_configs
 netscaler_common_config:
   nsconfig:
@@ -7,7 +9,7 @@ netscaler_common_config:
     cipheader: X-Forwarded-For
     cookieversion: 1
     securecookie: ENABLED
-    timezone: "GMT+01:00-CET-Europe/Berlin"
+#    timezone: "GMT+01:00-CET-Europe/Berlin"
 
 # default secure cipherset
 netscaler_common_sslcipher_sslciphersuite_binding:
@@ -42,6 +44,7 @@ netscaler_common_sslcipher_sslciphersuite_binding:
     - "ciphergroupname": "CUSTOM_SECURE"
       "ciphername": "TLS1-DHE-RSA-AES-128-CBC-SHA"
       "cipherpriority": "10"
+    # breaks xenmobile?
     - "ciphergroupname": "CUSTOM_SECURE"
       "ciphername": "TLS1-AES-256-CBC-SHA"
       "cipherpriority": "11"

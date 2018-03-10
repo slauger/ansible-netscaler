@@ -33,17 +33,26 @@
           monitor_name: mon_ivuwm_ms
         - servicegroupname: sg_http_ivuwm_ps
           monitor_name: mon_ivuwm_ps
+
+- name: Create vServers for IVUWM Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
       lbvserver:
-        - name: vs_lb_http_ivuwm_ms
-          ipv46: "*"
+        - name: "vs_lb_http_ivuwm_ms_{{ item }}"
+          ipv46: "{{ item }}"
           port: 7751
           servicetype: HTTP
           lbmethod: LEASTCONNECTION
           persistencetype: SOURCEIP
           timeout: 2
           comment: IVUWM MS Loadbalancing
-        - name: vs_lb_http_ivuwm_ps
-          ipv46: "*"
+        - name: "vs_lb_http_ivuwm_ps_{{ item }}"
+          ipv46: "{{ item }}"
           port: 7771
           servicetype: HTTP
           lbmethod: LEASTCONNECTION
@@ -51,13 +60,12 @@
           timeout: 2
           comment: IVUWM PS Loadbalancing
       lbvserver_servicegroup_binding:
-        - name: vs_lb_http_ivuwm_ms
+        - name: "vs_lb_http_ivuwm_ms_{{ item }}"
           servicegroupname: sg_http_ivuwm_ms
-        - name: vs_lb_http_ivuwm_ps
+        - name: "vs_lb_http_ivuwm_ps_{{ item }}"
           servicegroupname: sg_http_ivuwm_ps
-#    params:
-#      'idempotent': 'yes'
-#      'onerror': 'continue'
+  with_items: "{{ netscaler_lb_ivuwm_vips }}"
+  when: netscaler_lb_ivuwm_vips is defined
 
 - name: Bind members to the sg_ivuwm_ms service groups
   netscaler_raw:
@@ -85,6 +93,6 @@
       servicegroup_servicegroupmember_binding:
         - servicegroupname: sg_http_ivuwm_ps
           servername: "{{ item }}"
-          port: 7751
+          port: 7771
   with_items: "{{ netscaler_lb_ivuwm_ps_servers }}"
   when: netscaler_lb_ivuwm_ps_servers is defined

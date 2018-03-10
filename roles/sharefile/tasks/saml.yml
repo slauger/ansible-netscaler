@@ -1,8 +1,105 @@
 ---
 
-# TODO: AAA
-#add tm sessionAction act_session_sharefile -SSO ON -ssoCredential PRIMARY -ssoDomain CUSTOMER -homePage "https://${SF_SUBDOMAIN}.sharefile.com/saml/login"
-#add tm sessionPolicy pol_session_sharefile ns_true act_session_sharefile
+- name: enable the required features
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: nsfeature
+    data:
+      nsfeature:
+        feature: aaa
+    params:
+      action: enable
+
+- name: Create basic configuration for ShareFile Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      authenticationvserver:
+        name: vs_auth_sharefile
+        servicetype: SSL
+        authenticationdomain: "{{ netscaler_sharefile_authdomain }}"
+        comment: Sharefile Auth vServer
+        maxloginattempts: 10
+        failedlogintimeout: 30
+      vpnsessionaction:
+        - name: act_session_sharefile
+          sso: 'ON'
+          ssocredential: PRIMARY
+          forcedtimeout: '60'
+          homepage: "https://{{ netscaler_sharefile_cloud_domain }}/saml/login"
+          ntdomain: "{{ netscaler_sharefile_ssodomain }}"
+      vpnsessionpolicy:
+        - name: pol_session_sharefile
+          rule: ns_true
+          action: act_session_sharefile
+      authenticationsamlidpprofile:
+        - name: profile_auth_saml_idp_sharefile
+          samlspcertname: "{{ netscaler_sharefile_saml_sp_cert }}"
+          samlidpcertname: "{{ netscaler_sharefile_saml_idp_cert }}"
+          assertionconsumerserviceurl: "https://{{ netscaler_sharefile_domain }}/saml/acs"
+          samlissuername: "https://{{ netscaler_sharefile_domain }}/saml/login"
+          signaturealg: RSA-SHA256
+          audience: "https://{{ netscaler_sharefile_domain }}"
+      authenticationsamlidppolicy:
+        - name: pol_auth_saml_idp_sharefile
+          rule: HTTP.REQ.URL.CONTAINS("saml")
+          action: profile_auth_saml_idp_sharefile
+
+- name: Binding SSL certificates to AAA vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_auth_sharefile
+          certkeyname: "{{ netscaler_sharefile_certkey }}"
+
+- name: Create content switching actions
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      csaction:
+        - name: act_cs_sharefile_auth
+          targetvserver: vs_auth_sharefile
+          comment: Sharefile SAML Auth
+
+- name: Create content switching policies
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      cspolicy:
+        - policyname: pol_cs_sharefile_auth
+          rule: HTTP.REQ.URL.STARTSWITH_ANY("aaa_path") || HTTP.REQ.URL.EQUALS_ANY("aaa_url")
+          action: act_cs_sharefile_auth
+
+- name: Bind content switching policies to vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      csvserver_cspolicy_binding: 
+        - priority: 50
+          name: vs_cs_ssl_sharefile
+          policyname: pol_cs_sharefile_auth
+          gotopriorityexpression: END
+          
 #bind authentication vserver vs_aaa_sharefile_auth -policy pol_ldap_sharefile -priority 100
 #bind authentication vserver vs_aaa_sharefile_auth -policy pol_session_sharefile -priority 100
 #bind authentication vserver vs_aaa_sharefile_auth -policy pol_auth_saml_idp_sharefile -priority 100 -gotoPriorityExpression END

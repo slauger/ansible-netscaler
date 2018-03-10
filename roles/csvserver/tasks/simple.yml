@@ -1,0 +1,102 @@
+---
+
+- name: Create service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: "sg_{{ outer_item.backend }}_{{ outer_item.name }}"
+          servicetype: "{{ outer_item.backend }}"
+      lbvserver:
+        - name: "vs_lb_http_{{ outer_item.name }}"
+          servicetype: HTTP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+    params:
+      'idempotent': 'yes'
+
+- name: Enable authentication for the vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      lbvserver:
+        - name: "vs_lb_http_{{ outer_item.name }}"
+          authentication: "{{ outer_item.auth_enable | default('OFF') }}"
+          authnvsname: "{{ outer_item.auth_vserver }}"
+          authenticationhost: "{{ outer_item.auth_host | default() }}"
+          authn401: "{{ outer_item.auth_401 | default('OFF') }}"
+  when: outer_item.auth_enable is defined and
+        outer_item.auth_vserver is defined
+
+- name: Bind members to service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: "sg_{{ outer_item.backend }}_{{ outer_item.name }}"
+          port: "{{ outer_item.port }}"
+          servername: "{{ item }}"
+  with_items: "{{ outer_item.servers }}"
+    
+- name: Bind members to LB vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      lbvserver_servicegroup_binding:
+        - name: "vs_lb_http_{{ outer_item.name }}"
+          servicegroupname: "sg_{{ outer_item.backend }}_{{ outer_item.name }}"
+
+- name: Create content switching actions
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      csaction:
+        - name: "act_cs_{{ outer_item.name }}"
+          targetlbvserver: "vs_lb_http_{{ outer_item.name }}"
+
+- name: Create content switching policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      cspolicy:
+        - policyname: "pol_cs_{{ outer_item.name }}"
+          action: "act_cs_{{ outer_item.name }}"
+          rule: "{{ outer_item.rule }}"
+    params:
+      'idempotent': 'yes'
+
+- name: Bind Content Switching policies to the existing vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "macroapi"
+    data:
+      csvserver_cspolicy_binding:
+        - policyname: "pol_cs_{{ outer_item.name }}"
+          name: "{{ outer_item.csvserver }}"
+          priority: "{{ outer_item.priority }}"

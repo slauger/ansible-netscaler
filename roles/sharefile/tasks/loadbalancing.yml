@@ -65,9 +65,6 @@
         ipv46: "{{ netscaler_sharefile_vip }}"
         port: 443
         comment: Sharefile Content Switch
-      sslvserver_sslcertkey_binding:
-        - vservername: vs_cs_ssl_sharefile
-          certkeyname: "{{ netscaler_sharefile_certkey }}"
       policyhttpcallout:
         - name: callout_sharefile
           vserver: vs_lb_http_sharefile_data
@@ -86,6 +83,34 @@
     params:
       'idempotent': 'yes'
       'onerror': 'continue'
+
+- name: Bind SSL certificates to CS vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      sslvserver_sslcertkey_binding:
+        - vservername: vs_cs_ssl_sharefile
+          certkeyname: "{{ item.name }}"
+          snicert: "{{ item.snicert | default(false) }}"
+  with_items: "{{ netscaler_sharefile_certkey }}"
+
+- name: Bind SSL profile to CS vServer
+  shell: "ssh {{ netscaler_ip }} 'set ssl vserver vs_cs_ssl_sharefile -sslProfile ssl_profile_frontend_sni'"
+#  netscaler_raw:
+#    url: "{{ netscaler_url }}"
+#    username: "{{ netscaler_username }}"
+#    password: "{{ netscaler_password }}"
+#    method: "put"
+#    objecttype: "macroapi"
+#    data:
+#      sslprofile_sslvserver_binding:
+#        - name: "{{ netscaler_sharefile_sslprofile }}"
+#          servicename: vs_cs_ssl_sharefile
+#  when: netscaler_sharefile_sslprofile is defined
 
 - name: Create HTTP callout responder policy
   netscaler_raw:
@@ -141,13 +166,13 @@
     data:
       cspolicy:
         - policyname: pol_cs_sharefile_data
-          rule: HTTP.REQ.URL.CONTAINS("/cifs/").NOT && HTTP.REQ.URL.CONTAINS("/sp/").NOT || HTTP.REQ.URL.CONTAINS("/ProxyService/").NOT
+          rule: HTTP.REQ.HOSTNAME.EQ("{{ netscaler_sharefile_sz_domain }}") && (HTTP.REQ.URL.CONTAINS("/cifs/").NOT && HTTP.REQ.URL.CONTAINS("/sp/").NOT || HTTP.REQ.URL.CONTAINS("/ProxyService/").NOT)
           action: act_cs_sharefile_data
         - policyname: pol_cs_sharefile_connectors
-          rule: HTTP.REQ.URL.CONTAINS("/cifs/") || HTTP.REQ.URL.CONTAINS("/sp/") || HTTP.REQ.URL.CONTAINS("/ProxyService/")
+          rule: HTTP.REQ.HOSTNAME.EQ("{{ netscaler_sharefile_sz_domain }}") && (HTTP.REQ.URL.CONTAINS("/cifs/") || HTTP.REQ.URL.CONTAINS("/sp/") || HTTP.REQ.URL.CONTAINS("/ProxyService/"))
           action: act_cs_sharefile_connectors
         - policyname: pol_cs_sharefile_options
-          rule: HTTP.REQ.METHOD.EQ("OPTIONS")
+          rule: HTTP.REQ.HOSTNAME.EQ("{{ netscaler_sharefile_sz_domain }}") && (HTTP.REQ.METHOD.EQ("OPTIONS"))
           action: act_cs_sharefile_options
 
 - name: Bind content switching policies to vServer

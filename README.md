@@ -4,7 +4,7 @@ Some Ansible modules and roles for managing your favorite ADC - the Citrix NetSc
 
 Still in development (alpha stadium). Use with caution, especially in your production environment. 
 
-The Playbooks require at least Ansible 2.4. Running the plays *on* a NetScaler (as your Ansible control host) will not work. Currently NetScaler 12.0 is shipped with Python 2.6.6 and Ansible 2.1.1.0, which is completly outdated.
+The Playbooks require at least Ansible 2.4. Running the plays *on* a NetScaler (as your Ansible control host) will not work. Currently NetScaler 12.0 is shipped with Python 2.6.6 and Ansible 2.1.1.0, which is completely outdated.
 
 Feedback and feature requests are appreciated.
 
@@ -12,13 +12,34 @@ Feedback and feature requests are appreciated.
 
 The NetScaler module requires python-requests. 
 
+## Usage
+
+- Deploy your NetScaler (VPX/MPX/SDX/CPX)
+- Setup your network configuration
+- Configure a nsroot password
+- Upload the a license, your ssl certificates and a ECDHE key
+- Configure your inventory and run the playbook
+
+### Roles
+
+| role             | description 
+---                | ---        
+common             | Generic settings for all NetScaler setups (Best practices, SSL hardening, ...)
+config_clear       | Clear the NetScaler configuration (for a play on a "fresh" instance)
+config_save        | Save the NetScaler configuration
+cvserver           | Setup Content Switching configuration by providing a configuration hash
+sharefile          | Setup ShareFile Loadbalancing and AAA with SAML 
+xenmobile          | Setup a full XenMobile Setup (LB and VPN)
+
+... and many more.
+
 ## Parameters 
 
 ### General
 
 | parameter        | description 
 ---                | ---        
-netscaler_url      | URL to the the target NetScaler (without a tailing slash)
+netscaler_url      | URL to the the target NetScaler (without trailing slash)
 netscaler_username | Username for the administrative user
 netscaler_password | Password for the administrative user
 
@@ -28,26 +49,22 @@ netscaler_password | Password for the administrative user
 
 ## TODOs
 
-- docs 
-- Gateway configs
-- Sharefile configs
-- Exchange configs
-- remove JSON files
-- improve error handling in module
-- integrate servers in common -> DNS bootstrap?
-- how to deploy certs? NITRO vs SCP
-- caching and connection multiplexing for sharefile disabled
-- ssl
-  - ssldhfile
-  - sslcrlfile
-  - ocsp
-- systemsshkey
-- systemuser - second admin
-- systemfile
-- systembackup
-- facts (the easy way)
-- add nsroot/nsroot as default in defaults.yml in every roles
-- option to set url, username and password by $ENV
+- Documentation for everything
+- Exchange 2016 configuration (CS/AAA/Kerberos/NTLM)
+- Loadbalancing for DNS servers (bootstrapping problem in common)
+- Deploying certificates and license files trough NITRO, not trough SSH
+- Be sure that caching and connection multiplexing is disabled for ShareFile
+- SSL stuff
+  - integrate sslcrlfile
+  - integrate ocsp
+- SSH Keys
+  - systemsshkey
+- Management
+  - systemuser (secondary admin)
+- Integrate systemfile
+- Integrate systembackup
+- Facts (the easy way)
+- Option to set url, username and password by a ENV (run with Jenkins)
 
 ### How to implement customizations?
 

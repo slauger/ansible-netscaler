@@ -1,0 +1,17 @@
+---
+
+- hosts: netscaler
+  tasks:
+  - name: Get LB vServers
+    netscaler_raw:
+      url: "{{ netscaler_url }}"
+      username: "{{ netscaler_username }}"
+      password: "{{ netscaler_password }}"
+      method: get
+      objecttype: lbvserver
+    register: vservers
+  - name: debug vservers
+    debug:
+      msg: "{{ item.name }}"
+    with_items: "{{ vservers.meta.result.lbvserver }}"
+  gather_facts: no

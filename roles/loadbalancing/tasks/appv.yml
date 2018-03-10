@@ -1,3 +1,63 @@
 ---
-- name: example
-  shell: echo
+
+- name: Create basic configuration for AppV Loadbalancing
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_appv_mgmt
+          servicetype: TCP
+          comment: AppV MGMT
+        - servicegroupname: sg_appv_pub
+          servicetype: TCP
+          comment: AppV Pub
+      servicegroup_lbmonitor_binding:
+        - servicegroupname: sg_appv_mgmt
+          monitor_name: tcp
+        - servicegroupname: sg_appv_pub
+          monitor_name: tcp
+      lbvserver:
+        - name: vs_lb_appv_mgmt
+          ipv46: "{{ netscaler_lb_appv_vip }}"
+          port: 50001
+          servicetype: TCP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: AppV MGMT
+        - name: vs_lb_appv_pub
+          ipv46: "{{ netscaler_lb_appv_vip }}"
+          port: 50002
+          servicetype: TCP
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 2
+          comment: AppV Pub
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_appv_mgmt
+          servicegroupname: sg_appv_mgmt
+        - name: vs_lb_appv_pub
+          servicegroupname: sg_appv_pub
+
+- name: Bind members to the AppV service groups
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_appv_mgmt
+          servername: "{{ item }}"
+          port: 50001
+        - servicegroupname: sg_appv_pub
+          servername: "{{ item }}"
+          port: 50002
+  with_items: "{{ netscaler_lb_appv_servers }}"
+
+      

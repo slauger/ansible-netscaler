@@ -12,9 +12,10 @@
         - servicegroupname: sg_ssl_storefront
           servicetype: SSL
           comment: Storefront Loadbalancing
-      servicegroup_lbmonitor_binding:
-        - servicegroupname: sg_ssl_storefront
-          monitor_name: https
+# 302 on / -> need custom monitor
+#      servicegroup_lbmonitor_binding:
+#        - servicegroupname: sg_ssl_storefront
+#          monitor_name: https
       lbvserver:
         - name: vs_lb_ssl_storefront
           ipv46: "{{ netscaler_lb_storefront_vip }}"
@@ -51,4 +52,15 @@
 #      'onerror': 'continue'
   with_items: "{{ netscaler_lb_storefront_servers }}"
 
-      
+- name: Set local DNS record for Storefront
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      dnsaddrec:
+        - hostname: "{{ netscaler_lb_storefront_fqdn }}"
+          ipaddress: "{{ netscaler_lb_storefront_vip }}"
+  ignore_errors: true
+  when: netscaler_lb_storefront_fqdn is defined
