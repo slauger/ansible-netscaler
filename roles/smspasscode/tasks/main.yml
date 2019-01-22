@@ -18,7 +18,7 @@
           port: 1812
           lbmethod: LEASTCONNECTION
           persistencetype: SOURCEIP
-          timeout: 2
+          timeout: 5
           comment: RADIUS Loadbalancing
       lbvserver_servicegroup_binding:
         - name: vs_lb_radius_smspasscode
@@ -38,6 +38,58 @@
           port: 1812
   with_items: "{{ netscaler_smspasscode_servers }}"
   when: netscaler_smspasscode_servers is defined
+
+- name: Setup Backup Loadbalancing for RADIUS
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    data:
+      servicegroup:
+        - servicegroupname: sg_radius_smspasscode_backup
+          servicetype: RADIUS
+          comment: RADIUS Loadbalancing Backup
+      lbvserver:
+        - name: vs_lb_radius_smspasscode_backup
+          servicetype: RADIUS
+          lbmethod: LEASTCONNECTION
+          persistencetype: SOURCEIP
+          timeout: 5
+          comment: RADIUS Loadbalancing Backup
+      lbvserver_servicegroup_binding:
+        - name: vs_lb_radius_smspasscode_backup
+          servicegroupname: sg_radius_smspasscode_backup
+  when: netscaler_smspasscode_servers_backup is defined
+
+- name: Bind members to the backup service group
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "post"
+    objecttype: "macroapi"
+    data:
+      servicegroup_servicegroupmember_binding:
+        - servicegroupname: sg_radius_smspasscode_backup
+          servername: "{{ item }}"
+          port: 1812
+  with_items: "{{ netscaler_smspasscode_servers_backup }}"
+  when: netscaler_smspasscode_servers_backup is defined
+
+- name: Configure Backup Loadbalancing for RADIUS
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "lbvserver"
+    objectname: "vs_lb_radius_smspasscode"
+    method: "put"
+    data:
+      lbvserver:
+        name: vs_lb_radius_smspasscode
+        backupvserver: vs_lb_radius_smspasscode_backup
+  when: netscaler_smspasscode_servers_backup is defined
 
 - block:
   - name: Setup RADIUS authentication policy for SMS Passcode

@@ -1,0 +1,23 @@
+---
+
+- name: create ed25519 ssh host key
+  raw: "shell [ ! -f /nsconfig/ssh/ssh_host_ed25519_key ] && ssh-keygen -t ed25519 -f /nsconfig/ssh/ssh_host_ed25519_key -N ''"
+
+- name: create temp file for copy job
+  tempfile:
+    state: file
+  register: ssh_tempfile
+  delegate_to: localhost
+  changed: false
+
+- name: build ssh configuration
+  template:
+    src: "sshd_config"
+    dest: "{{ ssh_tempfile.path }}"
+  changed: false
+  
+- name: copy sshd_config file
+  shell: "rsync {{ ssh_tempfile.path }} nsroot@{{ netscaler_ip }}:/nsconfig/sshd_config"
+
+- name: verify ssh configuration
+  shell: "/usr/bin/sshd -f /nsconfig/sshd_config -t"
