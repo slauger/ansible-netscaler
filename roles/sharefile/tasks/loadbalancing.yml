@@ -99,18 +99,18 @@
   with_items: "{{ netscaler_sharefile_certkey }}"
 
 - name: Bind SSL profile to CS vServer
-  shell: "ssh {{ netscaler_ip }} 'set ssl vserver vs_cs_ssl_sharefile -sslProfile ssl_profile_frontend_sni'"
-#  netscaler_raw:
-#    url: "{{ netscaler_url }}"
-#    username: "{{ netscaler_username }}"
-#    password: "{{ netscaler_password }}"
-#    method: "put"
-#    objecttype: "macroapi"
-#    data:
-#      sslprofile_sslvserver_binding:
-#        - name: "{{ netscaler_sharefile_sslprofile }}"
-#          servicename: vs_cs_ssl_sharefile
-#  when: netscaler_sharefile_sslprofile is defined
+  #  shell: "ssh nsroot@{{ netscaler_ip }} 'set ssl vserver vs_cs_ssl_sharefile -sslProfile ssl_profile_frontend_sni'"
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "sslvserver"
+    data:
+      sslvserver:
+        - sslprofile: "{{ netscaler_sharefile_sslprofile }}"
+          vservername: vs_cs_ssl_sharefile
+  when: netscaler_sharefile_sslprofile is defined
 
 - name: Create HTTP callout responder policy
   netscaler_raw:

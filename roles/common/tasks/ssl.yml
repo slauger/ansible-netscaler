@@ -46,7 +46,7 @@
           dhfile: "/nsconfig/ssl/ECDHE.key"
           sessreuse: "DISABLED"
           # NetScaler 12.0
-          #hsts: "ENABLED"
+          hsts: "ENABLED"
 
 - name: best practice ssl settings for ns_default_ssl_profile_backend
   netscaler_raw:
@@ -82,8 +82,8 @@
           sessreuse: "DISABLED"
           snienable: "ENABLED"
           # NetScaler 12.0
-          #hsts: "ENABLED"
-          #maxage: 31536000
+          hsts: "ENABLED"
+          maxage: 31536000
         - name: ssl_profile_frontend_secure
           sslprofiletype: frontend
           ssl3: "DISABLED"
@@ -96,8 +96,8 @@
           sessreuse: "DISABLED"
           snienable: "ENABLED"
           # NetScaler 12.0
-          #hsts: "ENABLED"
-          #maxage: 31536000
+          hsts: "ENABLED"
+          maxage: 31536000
         - name: ssl_profile_frontend_clientcert_req
           sslprofiletype: frontend
           ssl3: "DISABLED"
@@ -110,8 +110,8 @@
           clientcert: "Mandatory"
           clientauthuseboundcachain: "ENABLED"
           # NetScaler 12.0
-          #hsts: "ENABLED"
-          #maxage: 31536000
+          hsts: "ENABLED"
+          maxage: 31536000
         - name: ssl_profile_frontend_clientcert_opt
           sslprofiletype: frontend
           ssl3: "DISABLED"
@@ -124,8 +124,8 @@
           clientcert: "Optional"
           clientauthuseboundcachain: "ENABLED"
           # NetScaler 12.0
-          #hsts: "ENABLED"
-          #maxage: 31536000
+          hsts: "ENABLED"
+          maxage: 31536000
         - name: ssl_profile_frontend_strict_sni
           sslprofiletype: frontend
           ssl3: "DISABLED"
@@ -137,8 +137,8 @@
           snienable: "ENABLED"
           dropreqwithnohostheader: "YES"
           # NetScaler 12.0
-          #hsts: "ENABLED"
-          #maxage: 31536000
+          hsts: "ENABLED"
+          maxage: 31536000
 
 - name: cipher binding for ns_default_ssl_profile_frontend and ns_default_ssl_profile_backend
   netscaler_raw:
@@ -227,6 +227,7 @@
       rewriteglobal_rewritepolicy_binding:
         policyname: pol_rewrite_inject_hsts_header
         priority: 900
+        gotopriorityexpression: NEXT
 
 #- name: Configure CRLs
 #  sslcrl

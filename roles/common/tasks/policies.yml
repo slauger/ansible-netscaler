@@ -1,0 +1,37 @@
+---
+- name: Configure password count rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      rewriteaction:
+        name: act_rewrite_pwcount_cookie
+        type: insert_http_header
+        target: Set-Cookie
+        stringbuilderexpr: '"pwcount=0"'
+      rewritepolicy:
+        name: pol_rewrite_pwcount_cookie
+        rule: "true"
+        action: act_rewrite_pwcount_cookie
+
+- name: Configure gateway auth type rewrite policy
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: macroapi
+    data:
+      rewriteaction:
+        name: "act_rewrite_auth_type_{{ item }}"
+        type: insert_http_header
+        target: X-Citrix-AM-GatewayAuthType
+        stringbuilderexpr: '"{{ item }}"'
+      rewritepolicy:
+        name: "pol_rewrite_auth_type_{{ item }}"
+        rule: "true"
+        action: "act_rewrite_auth_type_{{ item }}"
+  with_items:
+    - SMS
+    - CertAndRSA

@@ -82,11 +82,11 @@
     data:
       lbvserver_rewritepolicy_binding:
         - name: vs_lb_http_failback
-          policyname: pol_rewrite_inject_hsts_header
+          policyname: pol_rewrite_http_status_503
           bindpoint: RESPONSE
           priority: 900
         - name: vs_lb_ssl_failback
-          policyname: pol_rewrite_inject_hsts_header
+          policyname: pol_rewrite_http_status_503
           bindpoint: RESPONSE
           priority: 900
 

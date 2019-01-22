@@ -346,4 +346,21 @@
 #        - name: vs_vpn_xm_mam_gateway
 #          portaltheme: X1
 
+- name: Binding rewrite policies to the VPN vServer
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    objecttype: "macroapi"
+    method: "put"
+    data:
+      vpnvserver_rewritepolicy_binding:
+        - name: vs_vpn_xm_mam_gateway
+          policy: "{{ item.policy }}"
+          priority: "{{ item.priority }}"
+          bindpoint: "{{ item.bindpoint | default('RESPONSE') }}"
+          gotopriorityexpression: "{{ item.gotopriorityexpression | default('NEXT') }}"
+  with_items: "{{ netscaler_xenmobile_rewrite_policies }}"
+  when: netscaler_xenmobile_rewrite_policies is defined
+
 - include_tasks: sharefile.yml

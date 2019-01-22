@@ -197,6 +197,17 @@
           markconnreqinval: "ENABLED"
           http2: "DISABLED"
 
+- name: Configure global AAA settings
+  netscaler_raw:
+    url: "{{ netscaler_url }}"
+    username: "{{ netscaler_username }}"
+    password: "{{ netscaler_password }}"
+    method: "put"
+    objecttype: "aaaparameter"
+    data:
+      aaaparameter:
+        enableenhancedauthfeedback: "YES"
+
 # TBD: where to set?
 - name: enable session reliability on HA failover
   shell: echo ...

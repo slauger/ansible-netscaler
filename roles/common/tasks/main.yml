@@ -15,3 +15,5 @@
   when: netscaler_common_sshkeys is defined
 
 - include_tasks: ssl.yml
+
+- include_tasks: policies.yml
